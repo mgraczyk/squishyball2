@@ -1528,8 +1528,8 @@ float get_val(unsigned char *d, int bps){
 
 int setup_windows(pcm_t **pcm, int test_files){
   int i;
-  int fragsamples = pcm[0]->rate/20;  /* 50ms */
-
+  int fragsamples = pcm[0]->rate/10;  /* 100ms */
+  float mul = (pcm[0]->bits==24 ? 8388608.f : 32768.f) * .0625;
   /* precompute the fades/beeps */
   fadewindow1 = calloc(fragsamples,sizeof(*fadewindow1));
   fadewindow2 = calloc(fragsamples,sizeof(*fadewindow2));
@@ -1572,52 +1572,52 @@ int setup_windows(pcm_t **pcm, int test_files){
 
   /* Single beep for flipping */
   for(i=0;i<fragsamples/4;i++){
-    beep1[i]=0.;
-    beep1[fragsamples-i-1]=0.;
+    beep1[i]=0.f;
+    beep1[fragsamples-i-1]=0.f;
   }
-  float base = 3.14159f*2.f*500./pcm[0]->rate;
+  float base = 3.14159f*2.f*1000./pcm[0]->rate;
   for(;i<fragsamples*3/4;i++){
-    float f = i-fragsamples/4+.5;
-    float w = cos(3.14159f*f/fragsamples);
+    float f = i-fragsamples/4+.5f;
+    float w = cosf(3.14159f*f/fragsamples);
     float b =
-      sin(f*base)+
-      sin(f*base*3)*.33+
-      sin(f*base*5)*.2+
-      sin(f*base*7)*.14+
-      sin(f*base*9)*.11;
+      sinf(f*base)+
+      sinf(f*base*3)*.33f+
+      sinf(f*base*5)*.2f+
+      sinf(f*base*7)*.14f+
+      sinf(f*base*9)*.11f;
     w*=w;
-    beep1[i] = w*b*.125;
+    beep1[i] = w*b*mul;
   }
 
   /* Double beep for selection */
   for(i=0;i<fragsamples/4;i++){
-    beep2[i]=0.;
-    beep2[fragsamples-i-1]=0.;
+    beep2[i]=0.f;
+    beep2[fragsamples-i-1]=0.f;
   }
   for(;i<fragsamples/2;i++){
-    float f = i-fragsamples/4+.5;
-    float w = cos(3.14159f*2.*f/fragsamples);
+    float f = i-fragsamples/4+.5f;
+    float w = cosf(3.14159f*2.f*f/fragsamples);
     float b =
-      sin(f*base)+
-      sin(f*base*3)*.33+
-      sin(f*base*5)*.2+
-      sin(f*base*7)*.14+
-      sin(f*base*9)*.11;
+      sinf(f*base)+
+      sinf(f*base*3)*.33f+
+      sinf(f*base*5)*.2f+
+      sinf(f*base*7)*.14f+
+      sinf(f*base*9)*.11f;
     w*=w;
-    beep2[i] = w*b*.125;
+    beep2[i] = w*b*mul;
   }
-  base = 3.14159f*2.f*1000./pcm[0]->rate;
+  base = 3.14159f*2.f*1500./pcm[0]->rate;
   for(;i<fragsamples*3/4;i++){
-    float f = i-fragsamples/2+.5;
-    float w = cos(3.14159f*2.*f/fragsamples);
+    float f = i-fragsamples/2+.5f;
+    float w = cosf(3.14159f*2.f*f/fragsamples);
     float b =
-      sin(f*base)+
-      sin(f*base*3)*.33+
-      sin(f*base*5)*.2+
-      sin(f*base*7)*.14+
-      sin(f*base*9)*.11;
+      sinf(f*base)+
+      sinf(f*base*3)*.33f+
+      sinf(f*base*5)*.2f+
+      sinf(f*base*7)*.14f+
+      sinf(f*base*9)*.11f;
     w*=w;
-    beep2[i] = w*b*.125;
+    beep2[i] = w*b*mul;
   }
 
   /* make sure that the samples are at least fragsamples*2 in length! If they're not, extend... */
@@ -2365,7 +2365,7 @@ int main(int argc, char **argv){
           wB=wA+fragsamples-1;
           for(i=0;i<fragsamples;i++){
             for(j=0;j<ch;j++){
-              put_val(A,bps,get_val(A,bps)**(wA+i) + get_val(B,bps)**(wB-i)+(beep?beep[i]:0));
+              put_val(A,bps,get_val(A,bps)**(wA+i) + get_val(B,bps)**(wB-i) + (beep?beep[i]:0.f));
               A+=bps;
               B+=bps;
             }
