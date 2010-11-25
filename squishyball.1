@@ -1,0 +1,175 @@
+.\" Process this file with
+.\" groff -man -Tascii squishyball.1
+.\"
+.TH squishyball 1 "2010 November 18" "Xiph.Org Foundation" "Xiph Evaluation Tools"
+
+.SH NAME
+squishyball \- perform sample comparison testing on the command line
+
+.SH SYNOPSIS
+.B squishyball 
+[\fIoptions\fR] fileA [fileB [[\fB-c\fR] \fIfileN...\fR]]
+
+.SH DESCRIPTION
+.B squishyball
+is a simple command-line application used to perform double-blind A/B,
+A/B/X or X/X/Y testing on the command line.  The user specifies two
+input files to be compared and uses the keyboard during playback to
+flip between the randomized samples to perform on-the-fly comparisons.
+After a predetermined number of trials,
+.B squishyball 
+prints the trial results to the terminal and exits.
+
+.B squishyball
+can also be used to perform casual, non-randomized comparisons of
+groups of up to ten samples; this is the default mode of operation.
+
+.SH TEST TYPES
+.IP "\fB-a --ab"
+Perform randomized A/B test on two input samples.
+
+A/B testing randomizes the order of two input samples and presents
+them, unnamed, as sample 'A' and sample 'B'.  In each trial the user
+selects A or B as the preferred sample.  The samples are then
+re-randomized for the next trial.  This test is useful for
+establishing relative or preferred quality between two samples.
+.IP "\fB-b --abx"
+Perform randomized A/B/X test on two input samples.
+
+A/B/X testing randomizes the order of two input samples and presents
+them, unnamed, as sample 'A' and sample 'B'.  A third sample 'X' is
+also chosen randomly from either either 'A' or 'B'.  In each trial, the
+user selects A or B as the sample believed to be the same as X. All
+samples are then re-randomized for the next trial. This test is useful
+for determining if any differences are audible between two samples and
+to what confidence level.
+.IP "\fB-c --casual"
+Perform casual comparison of up to ten samples (default).
+
+Casual comparison mode does not randomize the input samples or perform
+multiple trials.  It simply provides a convenient way to rapidly flip back and
+forth within a group of up to ten samples.
+.IP "\fB-x --xxy"
+Perform randomized X/X/Y test on two input samples.
+
+X/X/Y testing is a form of A/B/X testing in which the position of the 'X'
+sample is not known ahead of time to be in the third position. In each trial,
+the user selects which of sample 1, 2 or 3 is believed to be the
+sample that is different from the other two. This test is useful for
+determining if any differences are audible between two samples and to
+what confidence level.
+.SH OTHER OPTIONS
+.IP "\fB-B --beep-flip"
+Mark transitions between samples with a short beep.
+.IP "\fB-d --device \fIN\fR|\fIdevice"
+If a number, output to Nth available sound device.  If a device name,
+use output device matching that device name.  The backend audio driver is
+selected automatically based on the device name provided.
+.IP "\fB-D --force-dither"
+Always use dither when down-converting to 16-bit samples for playback 
+on audio devices that do not support 24-bit playback. By default, 
+uncompressed samples are always dithered, but lossy formats (such 
+as Vorbis) are simply rounded.  See the section \fBCONVERSION AND DITHER
+\fRbelow for more details.
+.IP "\fB-e --end-time \fR[[\fIhh\fB:\fR]\fImm\fB:\fR]\fIss\fR[\fB.\fIff\fR]"
+Set sample end time for playback.
+.IP "\fB-h --help"
+Print usage summary to stdout and exit.
+.IP "\fB-M --mark-flip"
+Mark transitions between samples with a short period of silence (default).
+.IP "\fB-n --trials \fIn"
+Set desired number of comparison trials (default: 10).
+.IP "\fB-r --restart-after"
+Set 'restart-after mode', where sample playback restarts from start point
+after every trial.
+.IP "\fB-R --restart-every"
+Set 'restart-every mode', where sample playback restarts from start point
+after 'flip' as well as after every trial.
+.IP "\fB-s --start-time \fR[[\fIhh\fB:\fR]\fImm\fB:\fR]\fIss\fR[\fB.\fIff\fR]"
+Set start time within sample for playback
+.IP "\fB-S --seamless-flip"
+Do not mark transitions between samples;
+flip with a seamless crossfade.
+.IP "\fB-t --force-truncate"
+Always round/truncate (never dither) when down-converting samples to 16-bit
+for playback on audio devices that do not support 24-bit output.  See the
+section \fBCONVERSION AND DITHER\fR below for more details.
+.IP "\fB-v --verbose"
+Produce more and more detailed progress information and warnings.
+.IP "\fB-V --version"
+Print version and exit.
+
+.SH KEYBOARD INTERACTION
+.IP "\fBa\fR, \fBb\fR, \fBx"  
+Switch between A and B samples (A/B mode), or A, B and X samples (A/B/X mode)
+.IP "\fBA\fR, \fBB"
+Select A or B as preferred sample (A/B mode), or sample A or sample B as
+match to sample X (A/B/X testing mode)
+.IP "\fB1\fR, \fB2\fR, \fB3\fR..."
+Switch between first, second, third [etc] samples (X/X/Y testing mode, casual comparison mode)
+.IP "\fB!\fR, \fB@\fR, \fB#"
+Indicate the 'odd sample out' as sample 1, 2, or 3 (X/X/Y testing mode)
+.IP "\fB<-\fR, \fB->"
+Seek back/forward two seconds, \fB+shift \fRfor ten seconds.
+.IP "\fB<space>"
+Pause/resume playback.
+.IP "\fB<backspace>"
+Reset playback to start point.
+.IP "\fBe"
+Set end playback point to current playback time (see also -e above).
+.IP "\fBE"
+Reset end playback time to end of sample.
+.IP "\fBF"
+Toggle through beep-flip/mark-flip/seamless-flip modes (see \fB-B\fR, \fB-M\fR, and \fB-S \fRabove).
+.IP "\fBr"
+Toggle through restart-after/restart-every/no-restart modes (see \fB-r \fRand \fB-R \fRabove).
+.IP "\fBs"
+Set start playback point to current playback time (see also \fB-s \fRabove).
+.IP "\fBS"
+Reset start playback time to beginning of sample.
+.IP "\fB?"
+Print this keymap.
+.IP "\fB^c"
+Abort testing early.
+
+.SH SUPPORTED FILE TYPES
+
+.IP \fBWAV/WAVEX
+8-, 16-, 24-bit linear integer PCM (format 1), 32-bit float (format 3)
+.IP \fBAIFF/AIFF-C
+8-, 16-, 24-bit linear integer PCM
+.IP \fBFLAC/OggFLAC
+16- and 24-bit
+.IP \fBSW 
+Mono signed 16-bit little endian raw with a .sw extension
+.IP \fBOggVorbis
+all Vorbis I files
+
+.SH CONVERSION AND DITHER
+\fBsquishyball \fRloads all linear PCM file types at native bit depth. 
+Uncompressed floating point files (eg, 32 bit floating point WAV) are
+converted to 24-bit integer PCM.  Ogg Vorbis files are also decoded to
+24-bit.
+
+Files are 'reconciled' to identical channel ordering, length and
+bit-depth before playback begins so that CPU and memory resources usage
+during playback should be identical for both samples.  When 24-bit
+playback is available and at least one sample is 24-bit, all samples
+are promoted to 24 bits. If 24-bit playback is unavailable, 24-bit samples
+are demoted to 16 bits.
+
+Floating point samples (32-bit) are not dithered when converting to 24-bit. 
+24-bit and floating point (32 bit) samples are dithered using a TPDF 
+when down-conversion to 16-bit is necessary.  Lossy-encoded samples (eg
+Ogg Vorbis files) are an exception; they are not dithered by default during
+down-conversion. This behavior can be overridden by \fB-D\fR, 
+which forces dithering for lossy files as well.  Down-conversion
+dithering can be disabled for all input types with \fB-t\fR.
+
+.SH AUTHORS
+Monty <monty@xiph.org>
+
+.SH "SEE ALSO"
+
+.PP
+\fBabx-comparator\fR(1), \fBogg123\fR(1), \fBoggdec\fR(1), \fBflac\fR(1)
