@@ -33,6 +33,7 @@
 #include <errno.h>
 #include "mincurses.h"
 
+#if 0
 void fill(char *buf,char c,int cols){
   int i;
   for(i=0;i<cols;i++)
@@ -76,3 +77,4 @@ void printhline(char *s,int textcolor){
     }
   }
 }
+#endif

@@ -269,6 +269,7 @@ int min_flush(){
       len-=ret;
     }
   }
+  buf_fill=0;
   return 0;
 }
 

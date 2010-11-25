@@ -1617,7 +1617,7 @@ int setup_windows(pcm_t **pcm, int test_files){
       sinf(f*base*7)*.14f+
       sinf(f*base*9)*.11f;
     w*=w;
-    beep2[i] = w*b*mul;
+    beep2[i] = w*b*mul*2;
   }
 
   /* make sure that the samples are at least fragsamples*2 in length! If they're not, extend... */
@@ -2104,6 +2104,7 @@ int main(int argc, char **argv){
   fragsamples=setup_windows(pcm,test_files);
 
   /* set up terminal */
+  atexit(min_remove_panel);
   min_init_panel(5);
 
   /* set up shared state */
