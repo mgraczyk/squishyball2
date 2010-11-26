@@ -19,7 +19,7 @@
 #include <signal.h>
 #include <ncurses.h>
 #include "mincurses.h"
-#include "tty.h"
+#include "main.h"
 
 #define MAXFILES 10
 static int verbose=0;
@@ -33,19 +33,6 @@ static inline int host_is_big_endian() {
   if (m.bytewise[0] == 0xfe) return 1;
   return 0;
 }
-
-typedef struct pcm_struct pcm_t;
-
-struct pcm_struct {
-  char *path;
-  int rate;
-  int bits; /* negative indicates IEEE754 float */
-  int ch;
-  char *matrix;
-  unsigned char *data;
-  off_t size;
-  int dither;
-};
 
 void free_pcm(pcm_t *pcm){
   if(pcm){
@@ -1409,7 +1396,7 @@ void usage(FILE *out){
           "  -e --end-time <time>   : Set sample end time for playback\n"
           "  -h --help              : Print this usage information.\n"
           "  -M --mark-flip         : Mark transitions between samples with\n"
-          "                           a short period of silence (default)\n"
+          "                           a short period of silence\n"
           "  -n --trials <n>        : Set desired number of trials\n"
           "                           (default: 10)\n"
           "  -r --restart-after     : Restart playback from sample start\n"
@@ -1420,7 +1407,7 @@ void usage(FILE *out){
           "  -s --start-time <time> : Set start time within sample for\n"
           "                           playback\n"
           "  -S --seamless-flip     : Do not mark transitions between samples;\n"
-          "                           flip with a seamless crossfade\n"
+          "                           flip with a seamless crossfade (default)\n"
           "  -t --force-truncate    : Always truncate (never dither) when\n"
           "                           down-converting samples to 16-bit for\n"
           "                           playback.\n"
@@ -1456,22 +1443,6 @@ void usage(FILE *out){
           "  OggVorbis        : all Vorbis I files\n"
           "\n"
           ,VERSION);
-}
-
-static char timebuffer[80];
-static char *make_time_string(double s){
-  long hrs=s/60/60;
-  long min=s/60-hrs*60;
-  long sec=s-hrs*60*60-min*60;
-  long hsec=(s-(int)s)*100;
-  if(hrs>0){
-    snprintf(timebuffer,80,"%ld:%02ld:%02ld.%02ld",hrs,min,sec,hsec);
-  }else if(min>0){
-    snprintf(timebuffer,80,"%ld:%02ld.%02ld",min,sec,hsec);
-  }else{
-    snprintf(timebuffer,80,"%ld.%02ld",sec,hsec);
-  }
-  return timebuffer;
 }
 
 static int parse_time(char *s,double *t){
@@ -1917,7 +1888,7 @@ int main(int argc, char **argv){
   int force_dither=0;
   int force_truncate=0;
   int restart_mode=0;
-  int beep_mode=1;
+  int beep_mode=3;
   int tests=10;
   double start=0;
   double end=-1;
@@ -2092,7 +2063,7 @@ int main(int argc, char **argv){
       for(i=0;i<test_files;i++){
         if(verbose)
         fprintf(stderr,"\t%s: %s\n",pcm[i]->path,
-                make_time_string((double)pcm[i]->size/pcm[i]->ch/((pcm[i]->bits+7)/8)/pcm[i]->rate));
+                make_time_string((double)pcm[i]->size/pcm[i]->ch/((pcm[i]->bits+7)/8)/pcm[i]->rate,0));
         pcm[i]->size=n;
       }
       if(verbose)
@@ -2105,7 +2076,11 @@ int main(int argc, char **argv){
 
   /* set up terminal */
   atexit(min_remove_panel);
-  min_init_panel(5);
+  {
+    double len=pcm[0]->size/((pcm[0]->bits+7)/8)/pcm[0]->ch/(double)pcm[0]->rate;
+    panel_init(pcm, test_files, test_mode, start, end>0 ? end : len, len,
+               beep_mode, restart_mode, tests, "");
+  }
 
   /* set up shared state */
   memset(&state,0,sizeof(state));

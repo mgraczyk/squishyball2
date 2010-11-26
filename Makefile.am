@@ -8,7 +8,7 @@ bin_PROGRAMS = squishyball
 mandir = @MANDIR@
 man_MANS = squishyball.1
 
-squishyball_SOURCES = main.c tty.c tty.h mincurses.c mincurses.h
+squishyball_SOURCES = main.c main.h tty.c mincurses.c mincurses.h
 
 debug:
 	$(MAKE) all CFLAGS="@DEBUG@"

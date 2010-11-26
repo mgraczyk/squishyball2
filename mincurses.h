@@ -25,6 +25,7 @@
 #ifndef _MINCURSES_H_
 #define _MINCURSES_H_
 
+extern int min_flush();
 extern int min_getch(int nonblock);
 extern int min_putchar(int c);
 extern int min_putp(const char *str);
@@ -39,8 +40,13 @@ extern int min_clreol(void);
 extern int min_clrbol(void);
 extern int min_gfxmode(void);
 extern int min_textmode(void);
+
+extern int min_unset(void);
 extern int min_fg(int c);
 extern int min_bg(int c);
-extern void min_color(int f,int b);
-
+extern int min_color(int f,int b);
+extern int min_bold(int flag);
+extern int min_blink(int flag);
+extern int min_underline(int flag);
+extern int min_reverse(int flag);
 #endif

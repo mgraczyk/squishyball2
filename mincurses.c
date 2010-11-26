@@ -395,9 +395,9 @@ int min_init_panel(int pl){
 
 void min_remove_panel(){
   if(initted){
-    if(delete_line){
+    if(parm_delete_line){
       min_mvcur(0,0);
-      min_putp(tparm(delete_line,panel_lines));
+      min_putp(tparm(parm_delete_line,panel_lines));
     }
     min_showcur();
     min_flush();
@@ -454,7 +454,14 @@ int min_textmode(void){
     return 1;
 }
 
-static int unset_attributes(){
+static int fg=-1;
+static int bg=-1;
+static int bold=0;
+static int blink=0;
+static int rev=0;
+static int ul=0;
+
+static int unset(){
   if(exit_attribute_mode){
     min_putp(exit_attribute_mode);
     return 0;
@@ -462,25 +469,128 @@ static int unset_attributes(){
     return 1;
 }
 
+int min_unset(){
+  fg=-1;
+  bg=-1;
+  bold=0;
+  if(ul){
+    min_underline(0);
+    ul=0;
+  }
+  return unset();
+}
+
+static int reset(){
+  int ret=0;
+  if(fg>=0)ret|=min_fg(fg);
+  if(bg>=0)ret|=min_bg(bg);
+  if(bold)ret|=min_bold(1);
+  if(blink)ret|=min_blink(1);
+  if(rev)ret|=min_reverse(1);
+  return ret;
+}
+
 int min_fg(int c){
-  if(set_a_foreground){
-    min_putp(tparm(set_a_foreground,c));
-    return 0;
-  }else
-    return 1;
+  int ret=0;
+  if(c<0 && fg>=0){
+    fg=-1;
+    ret|=unset();
+    ret|=reset();
+  }else{
+    if(set_a_foreground){
+      fg=c;
+      min_putp(tparm(set_a_foreground,c));
+    }else
+      ret=1;
+  }
+  return ret;
 }
 
 int min_bg(int c){
-  if(set_a_background){
-    min_putp(tparm(set_a_background,c));
-    return 0;
-  }else
-    return 1;
+  int ret=0;
+  if(c<0 && bg>=0){
+    bg=-1;
+    ret|=unset();
+    ret|=reset();
+  }else{
+    if(set_a_background){
+      bg=c;
+      min_putp(tparm(set_a_background,c));
+    }else
+      ret=1;
+  }
+  return ret;
 }
 
-void min_color(int f,int b){
-  if(f==-1 || b==-1) unset_attributes();
-  if(f!=-1) min_fg(f);
-  if(b!=-1) min_bg(b);
+int min_bold(int flag){
+  int ret=0;
+  if(!flag && bold){
+    bold=0;
+    ret|=unset();
+    ret|=reset();
+  }else{
+    if(enter_bold_mode){
+      min_putp(enter_bold_mode);
+      bold=1;
+    }else
+      ret=1;
+  }
+  return ret;
 }
 
+int min_color(int f,int b){
+  int ret=0;
+  ret|=min_fg(f);
+  ret|=min_bg(b);
+  return ret;
+}
+
+int min_blink(int flag){
+  int ret=0;
+  if(!flag && blink){
+    blink=0;
+    ret|=unset();
+    ret|=reset();
+  }else{
+    if(enter_blink_mode){
+      min_putp(enter_blink_mode);
+      blink=1;
+    }else
+      ret=1;
+  }
+  return ret;
+}
+
+int min_underline(int flag){
+  if(flag){
+    if(enter_underline_mode){
+      ul=1;
+      min_putp(enter_underline_mode);
+      return 0;
+    }else
+      return 1;
+  }else{
+    if(exit_underline_mode){
+      ul=0;
+      min_putp(exit_underline_mode);
+      return 0;
+    }else
+      return 1;
+  }
+}
+
+int min_reverse(int flag){
+  int ret=0;
+  if(!flag && rev){
+    rev=0;
+    ret|=unset();
+    ret|=reset();
+  }else{
+    if(enter_reverse_mode){
+      min_putp(enter_reverse_mode);
+      rev=1;
+    }else
+      ret=1;
+  }
+  return ret;
+}
