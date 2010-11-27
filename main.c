@@ -1416,24 +1416,24 @@ void usage(FILE *out){
           "  -x --xxy               : Perform randomized X/X/Y test.\n"
           "\n"
           "INTERACTION:\n"
-          "   a b x   : Switch playback between A, B [and X] samples.\n"
-          "    A B    : Choose A or B sample for A/B[/X] trial result.\n"
-          "  1 2 3... : Switch between first, second, etc samples.\n"
-          "   ! @ #   : Choose sample 1, 2, or 3 for X/X/Y trial result.\n"
-          "<ins> <del>: Undo/redo last trial result selection.\n"
-          "  <enter>  : Choose current sample for this trial\n"
-          "   <- ->   : Seek back/forward two seconds, +shift for 10 seconds\n"
-          " <up/down> : Select sample from list (casual mode)\n"
-          "  <space>  : Pause/resume playback\n"
-          " <backspc> : Reset playback to start point\n"
-          "     e     : set end playback point to current playback time.\n"
-          "     E     : reset end playback time to end of sample\n"
-          "     f     : Toggle through beep-flip/mark-flip/seamless-flip modes.\n"
-          "     r     : Toggle through restart-after/restart-every/no-restart.\n"
-          "     s     : set start playback point to current playback time.\n"
-          "     S     : reset start playback time to 0:00:00.00\n"
-          "     ?     : Print this keymap\n"
-          "    ^-c    : Quit\n"
+          "    a b x    : Switch playback between A, B [and X] samples.\n"
+          "     A B     : Choose A or B sample for A/B[/X] trial result.\n"
+          "   1 2 3...  : Switch between first, second, etc samples.\n"
+          "    ! @ #    : Choose sample 1, 2, or 3 for X/X/Y trial result.\n"
+          " <del> <ins> : Undo/redo last trial result selection.\n"
+          "   <enter>   : Choose current sample for this trial\n"
+          "    <- ->    : Seek back/forward two seconds, +shift for 10 seconds\n"
+          "  <up/down>  : Select sample from list (casual mode)\n"
+          "   <space>   : Pause/resume playback\n"
+          "  <backspc>  : Reset playback to start point\n"
+          "      e      : set end playback point to current playback time.\n"
+          "      E      : reset end playback time to end of sample\n"
+          "      f      : Toggle through beep-flip/mark-flip/seamless-flip modes.\n"
+          "      r      : Toggle through restart-after/restart-every/no-restart.\n"
+          "      s      : set start playback point to current playback time.\n"
+          "      S      : reset start playback time to 0:00:00.00\n"
+          "      ?      : Print this keymap\n"
+          "     ^-c     : Quit\n"
           "\n"
           "SUPPORTED FILE TYPES:\n"
           "  WAV and WAVEX    : 8-, 16-, 24-bit linear integer PCM (format 1)\n"
@@ -1853,14 +1853,18 @@ void fill_fragment2(unsigned char *out, pcm_t *pcm, off_t start, off_t *pos, off
   }
 }
 
-void randomize_samples(int *r,int test_mode){
+void randomize_samples(int *r,int *cchoice, int test_mode){
   switch(test_mode){
   case 1:
+    r[0] = random()&1;
+    r[1] = 1-r[0];
     r[2] = random()&1;
-    /* fall through */
+    *cchoice = (r[1]==r[2] ? 1 : 0);
+    break;
   case 0:
     r[0] = random()&1;
     r[1] = 1-r[0];
+    *cchoice = (r[1]==1);
     break;
   case 2:
     r[0] = random()&1;
@@ -1870,7 +1874,17 @@ void randomize_samples(int *r,int test_mode){
     else
       r[2] = random()&1;
     break;
+    *cchoice = (r[0]==r[1] ? 2 : (r[1]==r[2] ? 0 : 1));
   }
+}
+
+double factorial(int x){
+  double f = 1.;
+  while(x>1){
+    f*=x;
+    x--;
+  }
+  return f;
 }
 
 int main(int argc, char **argv){
@@ -1897,6 +1911,13 @@ int main(int argc, char **argv){
   ao_device *adev=NULL;
   int randomize[MAXFILES];
   int i;
+
+  int  cchoice=-1;
+  char choice_list[MAXTRIALS];
+  char sample_list[MAXTRIALS];
+  int  tests_cursor=0;
+  int  tests_total=0;
+
   /* parse options */
 
   while((c=getopt_long(argc,argv,short_options,long_options,&long_option_index))!=EOF){
@@ -1940,6 +1961,10 @@ int main(int argc, char **argv){
       tests=atoi(optarg);
       if(tests<1){
         fprintf(stderr,"Error parsing argument to -n\n");
+        exit(1);
+      }
+      if(tests>MAXTRIALS){
+        fprintf(stderr,"Error parsing argument to -n (max %d trials)\n",MAXTRIALS);
         exit(1);
       }
       break;
@@ -2106,7 +2131,7 @@ int main(int argc, char **argv){
     randomize[i]=i;
   /* randomize samples for first trial */
   srandom(time(NULL)+getpid());
-  randomize_samples(randomize,test_mode);
+  randomize_samples(randomize,&cchoice,test_mode);
 
   /* playback loop */
   pthread_mutex_lock(&state.mutex);
@@ -2263,6 +2288,14 @@ int main(int argc, char **argv){
         case '?':
           panel_toggle_keymap();
           break;
+        case 331:
+          if(tests_cursor<tests_total)
+            tests_cursor++;
+          break;
+        case 330:
+          if(tests_cursor>0)
+            tests_cursor--;
+            break;
         }
 
         if(do_flip && flip_to==current_choice) do_flip=0;
@@ -2300,7 +2333,6 @@ int main(int argc, char **argv){
         pthread_cond_signal(&state.key_cond);
       }
 
-
       /* update terminal */
       {
         double base = 1.f/(rate*bpf);
@@ -2317,7 +2349,7 @@ int main(int argc, char **argv){
         panel_update_playing(current_choice);
         panel_update_repeat_mode(restart_mode);
         panel_update_flip_mode(beep_mode);
-        //panel_update_trials(trial_list);
+        panel_update_trials(choice_list,tests_cursor);
         min_flush();
         pthread_mutex_lock(&state.mutex);
       }
@@ -2337,11 +2369,26 @@ int main(int argc, char **argv){
         }
 
         if(do_select){
+
+          /* record choice; during selection, flip_to contains the test choice  */
+          choice_list[tests_cursor] = flip_to;
+          sample_list[tests_cursor] = (randomize[flip_to] == cchoice);
+          tests_cursor++;
+          tests_total=tests_cursor;
+
           /* randomize now so we can fill in fragmentB */
-          randomize_samples(randomize,test_mode);
+          randomize_samples(randomize,&cchoice,test_mode);
           if(restart_mode){
             seek_to += start_pos-current_pos;
             do_seek=1;
+          }
+          current_choice=0;
+
+          if(tests_cursor==tests){
+            pthread_mutex_lock(&state.mutex);
+            state.exiting=1;
+            pthread_mutex_unlock(&state.mutex);
+            break;
           }
         }
 
@@ -2448,9 +2495,43 @@ int main(int argc, char **argv){
   pthread_cond_signal(&state.play_cond);
   pthread_cancel(fd_handle);
   pthread_mutex_unlock(&state.mutex);
+
+  if(test_mode!=3 && tests_cursor>0){
+    int total1=0;
+    tests=tests_cursor;
+    for(i=0;i<tests;i++)
+      total1+=sample_list[i];
+
+    switch(test_mode){
+    case 0:
+      fprintf(stdout, "\nA/B test results:\n");
+      fprintf(stdout, "\tSample 1 (%s) chosen %d/%d trials.\n",pcm[0]->path,tests-total1,tests);
+      fprintf(stdout, "\tSample 2 (%s) chosen %d/%d trials.\n",pcm[1]->path,total1,tests);
+      break;
+    case 1:
+      fprintf(stdout, "\nA/B/X test results:\n");
+      fprintf(stdout, "\tCorrect sample identified %d/%d trials.\n",total1,tests);
+      break;
+    case 2:
+      fprintf(stdout, "\nX/X/Y test results:\n");
+      fprintf(stdout, "\tCorrect sample identified %d/%d trials.\n",total1,tests);
+      break;
+    }
+
+    if(test_mode==1 || test_mode==2){
+      // 0.5^20*(20!/(17!*3!))
+      double p=0;
+      for(i=total1;i<=tests;i++)
+        p += pow(.5,tests) * (factorial(tests) / (factorial(tests-i)*factorial(i)));
+      fprintf(stdout, "\tProbability of %d or better correct via random chance: %.2f%%\n",total1,p*100);
+      if(p<.05)
+        fprintf(stdout,"\tStatistically significant result (>=95%% confidence)\n");
+    }
+    fprintf(stdout,"\n");
+  }
+
   pthread_join(playback_handle,NULL);
   pthread_join(fd_handle,NULL);
-
   for(i=0;i<test_files;i++)
     free_pcm(pcm[i]);
   return 0;

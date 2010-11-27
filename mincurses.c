@@ -369,9 +369,9 @@ int min_panel_init(int pl){
     //if(ena_acs)min_putp(ena_acs);
     _nc_init_acs();
 
-    if(!cursor_up || !cursor_down || !column_address){
+    if(!cursor_up || !cursor_down || !column_address || pl>lines){
       SET_TTY(outfd,&orig);
-      ret=ERR;
+      return ERR;
     }
 
     /* set up keytables */
@@ -390,6 +390,9 @@ int min_panel_init(int pl){
 
 int min_panel_expand(int l,int bottomp){
   int i,ret=0;
+
+  if(panel_lines+l>lines)return 1;
+
   if(bottomp){
     min_mvcur(0,panel_lines);
     for(i=0;i<l-1;i++)
@@ -397,6 +400,7 @@ int min_panel_expand(int l,int bottomp){
     panel_lines+=l;
     cursor_line_offset=panel_lines-1;
   }else{
+    min_mvcur(0,panel_lines+l-1);
     min_mvcur(0,0);
     if(parm_insert_line){
       ret|=min_putp(tparm(parm_insert_line,l));

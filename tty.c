@@ -35,9 +35,9 @@
 #include "mincurses.h"
 
 static int force=0;
-static int p_tm,p_ch,p_b,p_r,p_fm,p_rm,pcm_n,p_tr,p_tn,p_pau,p_pl;
+static int p_tm,p_ch,p_b,p_r,p_fm,p_rm,pcm_n,p_tr,p_tmax,p_pau,p_pl,p_tn;
 static double p_st,p_cur,p_end,p_len;
-static char *p_tl;
+static char p_tl[MAXTRIALS];
 static pcm_t **pcm_p;
 
 static char timebuffer[80];
@@ -289,7 +289,7 @@ void panel_redraw_full(void){
   panel_update_repeat_mode(p_rm);
   panel_update_flip_mode(p_fm);
   if(p_tm!=3)
-    panel_update_trials(p_tl);
+    panel_update_trials(p_tl,p_tn);
   force=0;
   min_flush();
 }
@@ -297,7 +297,7 @@ void panel_redraw_full(void){
 void panel_init(pcm_t **pcm, int test_files, int test_mode, double start, double end, double size,
                 int flip_mode,int repeat_mode,int trials,char *trial_list){
   if(min_panel_init(test_mode==3 ? test_files+6:7)){
-    fprintf(stderr,"Unable to initialize terminal\n");
+    fprintf(stderr,"Unable to initialize terminal (possibly insufficient lines)\n");
     exit(101);
   }
 
@@ -318,10 +318,10 @@ void panel_init(pcm_t **pcm, int test_files, int test_mode, double start, double
   p_fm=flip_mode;
   p_rm=repeat_mode;
   p_tr=0;
-  p_tn=trials;
-  p_tl=strdup(trial_list);
+  p_tmax=trials;
+  p_tn=0;
   pcm_n=test_files;
-   pcm_p=pcm;
+  pcm_p=pcm;
   p_pau=0;
 
   min_hidecur();
@@ -454,33 +454,26 @@ void panel_update_flip_mode(int mode){
   }
 }
 
-static int old_p_tl_len=-1;
-void panel_update_trials(char *trial_list){
-  if(force || strcmp(p_tl,trial_list)){
+void panel_update_trials(char *choices, int n){
+  if(force || n!=p_tn || memcmp(p_tl,choices,n)){
     char buf[columns+1];
-    int k,l = strlen(trial_list);
-    if(p_tl)free(p_tl);
-    p_tl=strdup(trial_list);
-    min_mvcur(1,boxrow+1);
+    int i;
+    p_tn=n;
 
-    sprintf(buf," %d/%d trials: ",l,p_tn);
+    min_mvcur(1,boxrow+1);
+    sprintf(buf," %d/%d trials: ",p_tn,p_tmax);
     min_putstr(buf);
 
-    l+=strlen(buf);
-    if(l>columns-4){
-      min_putstr("...");
-      min_putstr(p_tl+l-columns-7);
-      l+=strlen(p_tl+l-columns-7);
-    }else{
-      min_putstr(p_tl);
-      l+=strlen(p_tl);
-    }
-    {
-      k=l;
-      while(k++<old_p_tl_len)
-        min_putchar(' ');
-      old_p_tl_len=l;
-    }
+    memcpy(p_tl,choices,n);
+    for(i=0;i<n;i++)
+      if(p_tm<2){
+        min_putchar(p_tl[i]+'A');
+      }else{
+        min_putchar(p_tl[i]+'1');
+      }
+    i+=strlen(buf);
+    for(;i<columns-2;i++)
+      min_putchar(' ');
   }
 }
 
@@ -563,8 +556,9 @@ static int p_keymap=0;
 void panel_toggle_keymap(){
   int l=18;
   int o=1;
-  p_keymap = !p_keymap;
-  if(p_keymap){
+  if(!p_keymap){
+    if(min_panel_expand(l,0))return;
+    p_keymap = !p_keymap;
     timerow+=l;
     playrow+=l;
     toprow+=l;
@@ -622,6 +616,7 @@ void panel_toggle_keymap(){
     min_putstr(": Quit");
     min_unset();
   }else{
+    p_keymap = !p_keymap;
     min_panel_contract(l,0);
     timerow-=l;
     playrow-=l;

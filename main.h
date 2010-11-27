@@ -24,6 +24,7 @@
 #ifndef _SB__H_
 #define _SB__H_
 
+#define MAXTRIALS 50
 typedef struct pcm_struct pcm_t;
 
 struct pcm_struct {
@@ -47,7 +48,7 @@ extern void panel_update_current(double time);
 extern void panel_update_end(double time);
 extern void panel_update_repeat_mode(int mode);
 extern void panel_update_flip_mode(int mode);
-extern void panel_update_trials(char *trial_list);
+extern void panel_update_trials(char *trial_list, int n);
 extern void panel_update_pause(int flag);
 extern void panel_toggle_keymap(void);
 #endif
