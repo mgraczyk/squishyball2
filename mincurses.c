@@ -325,13 +325,6 @@ void min_mvcur(int x, int y){
   if(column_address)min_putp(tparm(column_address,x));
 }
 
-static void insert_lines(int n){
-  int i;
-  for(i=0;i<n-1;i++)
-    min_putstr("\r\n");
-  cursor_line_offset=n-1;
-}
-
 static void setup_term_customize(void){
   if (cur_term != 0) {
     term = cur_term->Nttyb;
@@ -354,8 +347,8 @@ static void setup_term_customize(void){
 }
 
 extern void _nc_init_acs(void);
-int min_init_panel(int pl){
-  int ret = OK;
+int min_panel_init(int pl){
+  int i,ret = OK;
   if(!initted){
 
     if(isatty(STDOUT_FILENO))
@@ -386,14 +379,58 @@ int min_init_panel(int pl){
     minc_init_keytry();
 
     panel_lines=pl;
-    insert_lines(panel_lines);
+    for(i=0;i<pl-1;i++)
+      min_putstr("\r\n");
+    cursor_line_offset=pl-1;
     initted=1;
     min_flush();
   }
   return ret;
 }
 
-void min_remove_panel(){
+int min_panel_expand(int l,int bottomp){
+  int i,ret=0;
+  if(bottomp){
+    min_mvcur(0,panel_lines);
+    for(i=0;i<l-1;i++)
+      ret|=min_putstr("\n\r");
+    panel_lines+=l;
+    cursor_line_offset=panel_lines-1;
+  }else{
+    min_mvcur(0,0);
+    if(parm_insert_line){
+      ret|=min_putp(tparm(parm_insert_line,l));
+    }else
+      ret=1;
+    panel_lines+=l;
+    cursor_line_offset=0;
+  }
+  return ret;
+}
+
+int min_panel_contract(int l,int bottomp){
+  int ret=0;
+  if(l>0){
+    if(l>panel_lines)l=panel_lines;
+    if(bottomp){
+      min_mvcur(0,panel_lines-l);
+      if(parm_delete_line){
+        ret|=min_putp(tparm(parm_delete_line,l));
+      }else
+        ret=1;
+    }else{
+      min_mvcur(0,0);
+      if(parm_delete_line){
+        ret|=min_putp(tparm(parm_delete_line,l));
+      }else
+        ret=1;
+    }
+    panel_lines-=l;
+  }
+  return ret;
+}
+
+void min_panel_remove(){
   if(initted){
     if(parm_delete_line){
       min_mvcur(0,0);

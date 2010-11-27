@@ -49,5 +49,5 @@ extern void panel_update_repeat_mode(int mode);
 extern void panel_update_flip_mode(int mode);
 extern void panel_update_trials(char *trial_list);
 extern void panel_update_pause(int flag);
-
+extern void panel_toggle_keymap(void);
 #endif

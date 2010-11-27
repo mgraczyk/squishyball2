@@ -2076,7 +2076,7 @@ int main(int argc, char **argv){
   fragsamples=setup_windows(pcm,test_files);
 
   /* set up terminal */
-  atexit(min_remove_panel);
+  atexit(min_panel_remove);
   {
     double len=pcm[0]->size/((pcm[0]->bits+7)/8)/pcm[0]->ch/(double)pcm[0]->rate;
     panel_init(pcm, test_files, test_mode, start, end>0 ? end : len, len,
@@ -2261,6 +2261,7 @@ int main(int argc, char **argv){
           end_pos=pcm[0]->size;
           break;
         case '?':
+          panel_toggle_keymap();
           break;
         }
 
@@ -2441,7 +2442,7 @@ int main(int argc, char **argv){
   }
 
   /* tear down terminal */
-  min_remove_panel();
+  min_panel_remove();
 
   /* join */
   pthread_cond_signal(&state.play_cond);

@@ -296,7 +296,7 @@ void panel_redraw_full(void){
 
 void panel_init(pcm_t **pcm, int test_files, int test_mode, double start, double end, double size,
                 int flip_mode,int repeat_mode,int trials,char *trial_list){
-  if(min_init_panel(test_mode==3 ? test_files+6:7)){
+  if(min_panel_init(test_mode==3 ? test_files+6:7)){
     fprintf(stderr,"Unable to initialize terminal\n");
     exit(101);
   }
@@ -550,5 +550,83 @@ void panel_update_pause(int flag){
     min_putchar(ACS_HLINE);
     min_putchar(ACS_HLINE);
     min_unset();
+  }
+}
+
+static void min_putstrb(char *s){
+  min_bold(1);
+  min_putstr(s);
+  min_bold(0);
+}
+
+static int p_keymap=0;
+void panel_toggle_keymap(){
+  int l=18;
+  int o=1;
+  p_keymap = !p_keymap;
+  if(p_keymap){
+    timerow+=l;
+    playrow+=l;
+    toprow+=l;
+    boxrow+=l;
+    fliprow+=l;
+    min_panel_expand(l,0);
+    min_fg(COLOR_CYAN);
+    min_mvcur(0,o++);
+    min_putstrb("     a b x     ");
+    min_putstr(": Switch playback between A, B [and X] samples");
+    min_mvcur(0,o++);
+    min_putstrb("      A B      ");
+    min_putstr(": Choose A or B sample for A/B[/X] trial result");
+    min_mvcur(0,o++);
+    min_putstrb("    1 2 3...   ");
+    min_putstr(": Switch between first, second, etc samples");
+    min_mvcur(0,o++);
+    min_putstrb("     ! @ #     ");
+    min_putstr(": Choose sample 1, 2, or 3 for X/X/Y trial result");
+    min_mvcur(0,o++);
+    min_putstrb("  <ins> <del>  ");
+    min_putstr(": Undo/redo last trial result selection");
+    min_mvcur(0,o++);
+    min_putstrb("    <enter>    ");
+    min_putstr(": Choose current sample for this trial");
+    min_mvcur(0,o++);
+    min_putstrb("     <- ->     ");
+    min_putstr(": Seek back/forward two seconds, +shift for 10 seconds");
+    min_mvcur(0,o++);
+    min_putstrb("   <up/down>   ");
+    min_putstr(": Select sample from list (casual mode)");
+    min_mvcur(0,o++);
+    min_putstrb("    <space>    ");
+    min_putstr(": Pause/resume playback");
+    min_mvcur(0,o++);
+    min_putstrb("   <backspc>   ");
+    min_putstr(": Reset playback to start point");
+    min_mvcur(0,o++);
+    min_putstrb("      e E      ");
+    min_putstr(": set/reset end playback loop point");
+    min_mvcur(0,o++);
+    min_putstrb("       f       ");
+    min_putstr(": Toggle through beep-/mark-/seamless-flip modes");
+    min_mvcur(0,o++);
+    min_putstrb("       r       ");
+    min_putstr(": Toggle through restart-after/every/no-restart");
+    min_mvcur(0,o++);
+    min_putstrb("      s S      ");
+    min_putstr(": set/reset start playback loop point");
+    min_mvcur(0,o++);
+    min_putstrb("       ?       ");
+    min_putstr(": Print this keymap");
+    min_mvcur(0,o++);
+    min_putstrb("      ^-c      ");
+    min_putstr(": Quit");
+    min_unset();
+  }else{
+    min_panel_contract(l,0);
+    timerow-=l;
+    playrow-=l;
+    toprow-=l;
+    boxrow-=l;
+    fliprow-=l;
   }
 }
