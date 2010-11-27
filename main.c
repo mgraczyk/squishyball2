@@ -1864,7 +1864,7 @@ void randomize_samples(int *r,int *cchoice, int test_mode){
   case 0:
     r[0] = random()&1;
     r[1] = 1-r[0];
-    *cchoice = (r[1]==1);
+    *cchoice = 1;
     break;
   case 2:
     r[0] = random()&1;
@@ -2393,6 +2393,7 @@ int main(int argc, char **argv){
         }
 
         if(paused){
+          current_sample=randomize[current_choice];
           memset(fragmentA,0,fragsize);
           if(do_seek){
             current_pos+=seek_to;
@@ -2536,8 +2537,4 @@ int main(int argc, char **argv){
     free_pcm(pcm[i]);
   return 0;
 }
-
-
-  /* 0         1         2         3        4         5         6         7         8*/
-  /* 2/16/44.1 | trial ??/?? A | <<00:00:00 | 00:00:00 | 00:00:00>> | sre */
 
