@@ -1422,12 +1422,13 @@ void usage(FILE *out){
           "   ! @ #   : Choose sample 1, 2, or 3 for X/X/Y trial result.\n"
           "<ins> <del>: Undo/redo last trial result selection.\n"
           "  <enter>  : Choose current sample for this trial\n"
-          "   <- ->   : seek back/forward two seconds, +shift for 10 seconds\n"
+          "   <- ->   : Seek back/forward two seconds, +shift for 10 seconds\n"
+          " <up/down> : Select sample from list (casual mode)\n"
           "  <space>  : Pause/resume playback\n"
           " <backspc> : Reset playback to start point\n"
           "     e     : set end playback point to current playback time.\n"
           "     E     : reset end playback time to end of sample\n"
-          "     F     : Toggle through beep-flip/mark-flip/seamless-flip modes.\n"
+          "     f     : Toggle through beep-flip/mark-flip/seamless-flip modes.\n"
           "     r     : Toggle through restart-after/restart-every/no-restart.\n"
           "     s     : set start playback point to current playback time.\n"
           "     S     : reset start playback time to 0:00:00.00\n"
@@ -2124,8 +2125,8 @@ int main(int argc, char **argv){
     int bpf=ch*bps;
     int rate=pcm[0]->rate;
     int size=pcm[0]->size;
-    off_t start_pos=rint(start*rate);
-    off_t end_pos=(end>0?rint(end*rate):size);
+    off_t start_pos=rint(start*rate*bpf);
+    off_t end_pos=(end>0?rint(end*rate*bpf):size);
     off_t current_pos;
     int paused=0;
 
@@ -2147,6 +2148,7 @@ int main(int argc, char **argv){
       int c;
       if(state.exiting) break;
 
+      /* seeks and some other ops are batched */
       if(state.key_waiting && !do_flip && !do_pause && !do_select){
         /* service keyboard */
         c=state.key_waiting;
@@ -2155,13 +2157,22 @@ int main(int argc, char **argv){
         case ERR:
           break;
         case 3:
-          /* control-c */
-
+          /* control-c == quit */
           pthread_mutex_lock(&state.mutex);
           state.exiting=1;
           pthread_mutex_unlock(&state.mutex);
           break;
-
+        case KEY_UP:
+          if(current_choice>0){
+            flip_to=current_choice-1;
+            do_flip=1;
+          }
+          break;
+        case KEY_DOWN:
+          flip_to=current_choice+1;
+          do_flip=1;
+          /* range checking enforced later */
+          break;
         case '0': case '9': case '8': case '7': case '6':
         case '5': case '4': case '3': case '2': case '1':
           flip_to=c-'1';
@@ -2226,6 +2237,31 @@ int main(int argc, char **argv){
           seek_to=start_pos;
           do_seek=1;
           break;
+        case 'f':
+          beep_mode++;
+          if(beep_mode>3)beep_mode=1;
+          break;
+        case 'r':
+          restart_mode++;
+          if(test_mode==3 && restart_mode==1)restart_mode++;
+          if(restart_mode>2)restart_mode=0;
+          break;
+        case 's':
+          if(current_pos<end_pos)
+            start_pos=current_pos;
+          break;
+        case 'S':
+          start_pos=0;
+          break;
+        case 'e':
+          if(current_pos>start_pos)
+            end_pos=current_pos;
+          break;
+        case 'E':
+          end_pos=pcm[0]->size;
+          break;
+        case '?':
+          break;
         }
 
         if(do_flip && flip_to==current_choice) do_flip=0;
@@ -2266,8 +2302,23 @@ int main(int argc, char **argv){
 
       /* update terminal */
       {
-        double current = (double)current_pos/(pcm[0]->ch*(pcm[0]->bits+7)/8*pcm[0]->rate);
+        double base = 1.f/(rate*bpf);
+        double current = current_pos*base;
+        double start = start_pos*base;
+        double len = pcm[0]->size*base;
+        double end = end_pos>0?end_pos*base:len;
+
+        pthread_mutex_unlock(&state.mutex);
+        panel_update_start(start);
         panel_update_current(current);
+        panel_update_end(end);
+        panel_update_pause(paused);
+        panel_update_playing(current_choice);
+        panel_update_repeat_mode(restart_mode);
+        panel_update_flip_mode(beep_mode);
+        //panel_update_trials(trial_list);
+        min_flush();
+        pthread_mutex_lock(&state.mutex);
       }
 
       if(state.fragment_size==0 && !state.exiting){

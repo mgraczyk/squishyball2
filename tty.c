@@ -34,6 +34,7 @@
 #include "main.h"
 #include "mincurses.h"
 
+static int force=0;
 static int p_tm,p_ch,p_b,p_r,p_fm,p_rm,pcm_n,p_tr,p_tn,p_pau,p_pl;
 static double p_st,p_cur,p_end,p_len;
 static char *p_tl;
@@ -279,6 +280,7 @@ void panel_redraw_full(void){
   draw_playbar(i++);
   draw_timebar(i++);
   draw_topbar(1);
+  force=1;
   panel_update_pause(p_pau);
   panel_update_playing(p_pl);
   panel_update_start(p_st);
@@ -288,6 +290,7 @@ void panel_redraw_full(void){
   panel_update_flip_mode(p_fm);
   if(p_tm!=3)
     panel_update_trials(p_tl);
+  force=0;
   min_flush();
 }
 
@@ -326,220 +329,226 @@ void panel_init(pcm_t **pcm, int test_files, int test_mode, double start, double
 }
 
 void panel_update_start(double time){
-  p_st=time;
-  min_mvcur(columns/2-21,timerow);
-  min_putchar(' ');
-  if(p_st<=0.f){
-    min_fg(COLOR_CYAN);
-    min_putstr("xx:xx:xx.xx");
-    min_fg(-1);
-  }else{
-    char *time=make_time_string(p_st,1);
-    min_putstr(time);
+  if(force || p_st!=time){
+    p_st=time;
+    min_mvcur(columns/2-21,timerow);
+    min_putchar(' ');
+    if(p_st<=0.f){
+      min_fg(COLOR_CYAN);
+      min_putstr("xx:xx:xx.xx");
+      min_fg(-1);
+    }else{
+      char *time=make_time_string(p_st,1);
+      min_putstr(time);
+    }
+    min_putchar(' ');
+    draw_playbar(playrow);
   }
-  min_putchar(' ');
-  draw_playbar(playrow);
-  min_flush();
 }
 
 void panel_update_current(double time){
-  int was = rint(p_cur/(p_len-1)*columns);
-  int now = rint(time/(p_len-1)*columns);
-  p_cur=time;
-  min_mvcur(columns/2-7,timerow);
-  min_putchar(' ');
-  {
-    char *time=make_time_string(p_cur,1);
-    min_putstr(time);
-  }
-  min_putchar(' ');
-
-  if(was!=now){
-    int pre = rint(p_st/p_len*columns);
-    int post = rint((p_len-p_end)/p_len*columns);
-
-    min_bold(1);
-    min_gfx(1);
-
-    min_mvcur(was,playrow);
-    if(was<pre || (columns-was)<post){
-      min_color(COLOR_YELLOW,COLOR_CYAN);
-    }else{
-      min_color(COLOR_YELLOW,COLOR_BLACK);
+  if(force || p_cur!=time){
+    int was = rint(p_cur/(p_len-1)*columns);
+    int now = rint(time/(p_len-1)*columns);
+    p_cur=time;
+    min_mvcur(columns/2-7,timerow);
+    min_putchar(' ');
+    {
+      char *time=make_time_string(p_cur,1);
+      min_putstr(time);
     }
     min_putchar(' ');
 
+    if(was!=now){
+      int pre = rint(p_st/p_len*columns);
+      int post = rint((p_len-p_end)/p_len*columns);
 
-    min_mvcur(now,playrow);
-    if(now<pre || (columns-now)<post){
-      min_bg(COLOR_CYAN);
-    }else{
-      min_bg(COLOR_BLACK);
+      min_bold(1);
+      min_gfx(1);
+
+      min_mvcur(was,playrow);
+      if(was<pre || (columns-was)<post){
+        min_color(COLOR_YELLOW,COLOR_CYAN);
+      }else{
+        min_color(COLOR_YELLOW,COLOR_BLACK);
+      }
+      min_putchar(' ');
+
+      min_mvcur(now,playrow);
+      if(now<pre || (columns-now)<post){
+        min_bg(COLOR_CYAN);
+      }else{
+        min_bg(COLOR_BLACK);
+      }
+      min_putchar(ACS_VLINE);
     }
-    min_putchar(ACS_VLINE);
+    min_unset();
   }
-  min_unset();
-  min_flush();
 }
 
 void panel_update_end(double time){
-  p_end=time;
-  min_mvcur(columns/2+7,timerow);
-  min_putchar(' ');
-  if(p_end>=p_len){
-    min_fg(COLOR_CYAN);
-    min_putstr("xx:xx:xx.xx");
-    min_fg(-1);
-  }else{
-    char *time=make_time_string(p_end,1);
-    min_putstr(time);
+  if(force || p_end!=time){
+    p_end=time;
+    min_mvcur(columns/2+7,timerow);
+    min_putchar(' ');
+    if(p_end+1.e-6>=p_len){
+      min_fg(COLOR_CYAN);
+      min_putstr("xx:xx:xx.xx");
+      min_fg(-1);
+    }else{
+      char *time=make_time_string(p_end,1);
+      min_putstr(time);
+    }
+    min_putchar(' ');
+    draw_playbar(playrow);
   }
-  min_putchar(' ');
-  draw_playbar(playrow);
-  min_flush();
 }
 
 void panel_update_repeat_mode(int mode){
-  int i;
-  min_mvcur(columns-31,fliprow);
-  p_rm=mode;
-  switch(p_rm){
-  case 0:
-    min_fg(COLOR_CYAN);
-    min_gfx(1);
-    for(i=0;i<15;i++)
-      min_putchar(ACS_HLINE);
-    min_unset();
-    break;
-  case 1:
-    min_putstr(" RESTART AFTER ");
-    break;
-  case 2:
-    min_mvcur(columns-31,fliprow+2);
-    min_putstr(" RESTART EVERY ");
-    break;
+  if(p_rm!=mode){
+    int i;
+    min_mvcur(columns-30,fliprow);
+    p_rm=mode;
+    switch(p_rm){
+    case 0:
+      min_fg(COLOR_CYAN);
+      min_gfx(1);
+      for(i=0;i<15;i++)
+        min_putchar(ACS_HLINE);
+      min_unset();
+      break;
+    case 1:
+      min_putstr(" RESTART AFTER ");
+      break;
+    case 2:
+      min_putstr(" RESTART EVERY ");
+      break;
+    }
   }
-  min_flush();
 }
 
 void panel_update_flip_mode(int mode){
-  min_mvcur(columns-14,fliprow);
-  min_fg(COLOR_CYAN);
-  min_gfx(1);
-  min_putchar(ACS_HLINE);
-  min_putchar(ACS_HLINE);
-  min_unset();
-
-  p_fm=mode;
-  switch(p_fm){
-  case 1:
-    min_mvcur(columns-12,fliprow);
-    min_putstr(" MARK FLIP ");
-    break;
-  case 2:
-    min_mvcur(columns-12,fliprow);
-    min_putstr(" BEEP FLIP ");
-    break;
-  case 3:
+  if(force || p_fm!=mode){
     min_mvcur(columns-14,fliprow);
-    min_putstr(" SILENT FLIP ");
-    break;
+    min_fg(COLOR_CYAN);
+    min_gfx(1);
+    min_putchar(ACS_HLINE);
+    min_putchar(ACS_HLINE);
+    min_unset();
+
+    p_fm=mode;
+    switch(p_fm){
+    case 1:
+      min_mvcur(columns-12,fliprow);
+      min_putstr(" MARK FLIP ");
+      break;
+    case 2:
+      min_mvcur(columns-12,fliprow);
+      min_putstr(" BEEP FLIP ");
+      break;
+    case 3:
+      min_mvcur(columns-14,fliprow);
+      min_putstr(" SILENT FLIP ");
+      break;
+    }
   }
-  min_flush();
 }
 
 static int old_p_tl_len=-1;
 void panel_update_trials(char *trial_list){
-  char buf[columns+1];
-  int k,l = strlen(trial_list);
-  if(p_tl)free(p_tl);
-  p_tl=strdup(trial_list);
-  min_mvcur(1,boxrow+1);
+  if(force || strcmp(p_tl,trial_list)){
+    char buf[columns+1];
+    int k,l = strlen(trial_list);
+    if(p_tl)free(p_tl);
+    p_tl=strdup(trial_list);
+    min_mvcur(1,boxrow+1);
 
-  sprintf(buf," %d/%d trials: ",l,p_tn);
-  min_putstr(buf);
+    sprintf(buf," %d/%d trials: ",l,p_tn);
+    min_putstr(buf);
 
-  l+=strlen(buf);
-  if(l>columns-4){
-    min_putstr("...");
-    min_putstr(p_tl+l-columns-7);
-    l+=strlen(p_tl+l-columns-7);
-  }else{
-    min_putstr(p_tl);
-    l+=strlen(p_tl);
+    l+=strlen(buf);
+    if(l>columns-4){
+      min_putstr("...");
+      min_putstr(p_tl+l-columns-7);
+      l+=strlen(p_tl+l-columns-7);
+    }else{
+      min_putstr(p_tl);
+      l+=strlen(p_tl);
+    }
+    {
+      k=l;
+      while(k++<old_p_tl_len)
+        min_putchar(' ');
+      old_p_tl_len=l;
+    }
   }
-  {
-    k=l;
-    while(k++<old_p_tl_len)
-      min_putchar(' ');
-    old_p_tl_len=l;
-  }
-  min_flush();
 }
 
 void panel_update_playing(int n){
-  if(p_tm==3){
-    min_mvcur(1,boxrow+1+p_pl);
-    min_putchar(' ');
-    if(strlen(pcm_p[p_pl]->path)>columns-4)
-      min_putstr(pcm_p[p_pl]->path+strlen(pcm_p[p_pl]->path)-columns+4);
-    else
-      min_putstr(pcm_p[p_pl]->path);
+  if(force || n!=p_pl){
+    if(p_tm==3){
+      min_mvcur(1,boxrow+1+p_pl);
+      min_putchar(' ');
+      if(strlen(pcm_p[p_pl]->path)>columns-4)
+        min_putstr(pcm_p[p_pl]->path+strlen(pcm_p[p_pl]->path)-columns+4);
+      else
+        min_putstr(pcm_p[p_pl]->path);
 
-    min_mvcur(1,boxrow+1+n);
-    min_putchar('>');
-    min_bold(1);
-    if(strlen(pcm_p[n]->path)>columns-4)
-      min_putstr(pcm_p[n]->path+strlen(pcm_p[n]->path)-columns+4);
-    else
-      min_putstr(pcm_p[n]->path);
-    min_unset();
-  }
+      min_mvcur(1,boxrow+1+n);
+      min_putchar('>');
+      min_bold(1);
+      if(strlen(pcm_p[n]->path)>columns-4)
+        min_putstr(pcm_p[n]->path+strlen(pcm_p[n]->path)-columns+4);
+      else
+        min_putstr(pcm_p[n]->path);
+      min_unset();
+    }
 
-  p_pl=n;
-  if(!p_pau){
-    min_mvcur(8,timerow);
-    switch(p_tm){
-    case 0: /* AB */
-    case 1: /* ABX */
-      min_putchar(p_pl+'A');
-      break;
-    case 2: /* XXY*/
-    case 3: /* Casual */
-      min_putchar(p_pl+'1');
-      break;
+    p_pl=n;
+    if(!p_pau){
+      min_mvcur(8,timerow);
+      switch(p_tm){
+      case 0: /* AB */
+      case 1: /* ABX */
+        min_putchar(p_pl+'A');
+        break;
+      case 2: /* XXY*/
+      case 3: /* Casual */
+        min_putchar(p_pl+'1');
+        break;
+      }
     }
   }
-  min_flush();
 }
 
 void panel_update_pause(int flag){
-  p_pau=flag;
-  min_mvcur(0,timerow);
-  if(p_pau){
-    min_blink(1);
-    min_putstr("PAUSED ");
-    min_blink(0);
-  }else{
-    min_putstr("PLAYING ");
-    switch(p_tm){
-    case 0: /* AB */
-    case 1: /* ABX */
-      min_putchar(p_pl+'A');
-      break;
-    case 2: /* XXY*/
-    case 3: /* Casual */
-      min_putchar(p_pl+'1');
-      break;
+  if(flag!=p_pau || force){
+    p_pau=flag;
+    min_mvcur(0,timerow);
+    if(p_pau){
+      min_blink(1);
+      min_putstr("PAUSED ");
+      min_blink(0);
+    }else{
+      min_putstr("PLAYING ");
+      switch(p_tm){
+      case 0: /* AB */
+      case 1: /* ABX */
+        min_putchar(p_pl+'A');
+        break;
+      case 2: /* XXY*/
+      case 3: /* Casual */
+        min_putchar(p_pl+'1');
+        break;
+      }
+      min_putchar(' ');
     }
-  }
-  min_putchar(' ');
 
-  min_gfx(1);
-  min_fg(COLOR_CYAN);
-  min_putchar(ACS_HLINE);
-  min_putchar(ACS_HLINE);
-  min_putchar(ACS_HLINE);
-  min_unset();
-  min_flush();
+    min_gfx(1);
+    min_fg(COLOR_CYAN);
+    min_putchar(ACS_HLINE);
+    min_putchar(ACS_HLINE);
+    min_putchar(ACS_HLINE);
+    min_unset();
+  }
 }
