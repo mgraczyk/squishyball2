@@ -159,28 +159,17 @@ static void draw_timebar(int row){
 static void draw_playbar(int row){
   int pre = rint(p_st/p_len*columns);
   int post = rint((p_len-p_end)/p_len*columns);
-  int cur = rint(p_cur/(p_len-1)*columns);
   int i;
   playrow=row;
 
   i=0;
   min_mvcur(0,row);
-  min_gfx(1);
-  min_color(COLOR_YELLOW,COLOR_CYAN);
-  min_bold(1);
-  if(pre>0){
-    while(i<pre){
-      min_putchar(' ');
-      i++;
-    }
-  }
-  min_bg(COLOR_BLACK);
-  while(i<cur){
+  min_bg(COLOR_CYAN);
+  while(i<pre){
     min_putchar(' ');
     i++;
   }
-  min_putchar(ACS_VLINE);
-  i++;
+  min_bg(COLOR_BLACK);
   while(i<(columns-post)){
     min_putchar(' ');
     i++;
@@ -343,13 +332,18 @@ void panel_update_start(double time){
     }
     min_putchar(' ');
     draw_playbar(playrow);
+    force=1;
+    panel_update_current(p_cur);
+    force=0;
   }
 }
 
+static int was=-1;
 void panel_update_current(double time){
+  int now = floor(time/p_len*columns);
+  if(now>=columns)now=columns-1;
   if(force || p_cur!=time){
-    int was = rint(p_cur/(p_len-1)*columns);
-    int now = rint(time/(p_len-1)*columns);
+
     p_cur=time;
     min_mvcur(columns/2-7,timerow);
     min_putchar(' ');
@@ -359,20 +353,23 @@ void panel_update_current(double time){
     }
     min_putchar(' ');
 
-    if(was!=now){
+    if(was!=now || force){
       int pre = rint(p_st/p_len*columns);
       int post = rint((p_len-p_end)/p_len*columns);
 
       min_bold(1);
       min_gfx(1);
 
-      min_mvcur(was,playrow);
-      if(was<pre || (columns-was)<post){
-        min_color(COLOR_YELLOW,COLOR_CYAN);
-      }else{
-        min_color(COLOR_YELLOW,COLOR_BLACK);
+      if(was>=0){
+        min_mvcur(was,playrow);
+        if(was<pre || (columns-was)<post){
+          min_color(COLOR_YELLOW,COLOR_CYAN);
+        }else{
+          min_color(COLOR_YELLOW,COLOR_BLACK);
+        }
+        min_putchar(' ');
       }
-      min_putchar(' ');
+      was=now;
 
       min_mvcur(now,playrow);
       if(now<pre || (columns-now)<post){
@@ -383,6 +380,7 @@ void panel_update_current(double time){
       min_putchar(ACS_VLINE);
     }
     min_unset();
+    min_flush();
   }
 }
 
@@ -401,6 +399,9 @@ void panel_update_end(double time){
     }
     min_putchar(' ');
     draw_playbar(playrow);
+    force=1;
+    panel_update_current(p_cur);
+    force=0;
   }
 }
 

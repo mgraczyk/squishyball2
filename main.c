@@ -1714,10 +1714,10 @@ void fill_fragment1(unsigned char *out, pcm_t *pcm, off_t start, off_t *pos, off
   int fragsize = fragsamples*bpf;
 
   /* guard limits here */
-  if(end<fragsize)end=fragsize;
+  if(end<fragsize*3)end=fragsize*3;
   if(end>pcm->size)end=pcm->size;
   if(start<0)start=0;
-  if(start>pcm->size-fragsize)start=pcm->size-fragsize;
+  if(start>pcm->size-fragsize*3)start=pcm->size-fragsize*3;
 
   /* we fill a fragment from the data buffer of the passed in pcm_t.
      It's possible we'll need to crossloop from the end of the sample,
@@ -1735,7 +1735,7 @@ void fill_fragment1(unsigned char *out, pcm_t *pcm, off_t start, off_t *pos, off
       if(lp){
         float w = fadewindow1[--lp];
         for(j=0;j<cpf;j++){
-          float val = get_val(A,bps)*(1.-w) + get_val(B,bps)*w;
+          float val = get_val(A,bps)*(1.f-w) + get_val(B,bps)*w;
           put_val(out,val,bps);
           A+=bps;
           B+=bps;
@@ -1759,7 +1759,7 @@ void fill_fragment1(unsigned char *out, pcm_t *pcm, off_t start, off_t *pos, off
       /* Error condition; should not be possible */
       fprintf(stderr,"Internal error; %ld>%ld, Monty fucked up.\n",(long)*pos,(long)pcm->size-fragsize);
       exit(100);
-    }else if(*pos+fragsize>=end-fragsize){
+    }else if(*pos+fragsize>end-fragsize){
       int i,j;
       unsigned char *A = pcm->data+*pos;
       unsigned char *B = pcm->data+start;
@@ -1767,7 +1767,7 @@ void fill_fragment1(unsigned char *out, pcm_t *pcm, off_t start, off_t *pos, off
       if(lp<fragsamples)lp=fragsamples; /* If we're late, start immediately, but use full window */
 
       for(i=0;i<fragsamples;i++){
-        if(--lp>fragsamples){
+        if(--lp>=fragsamples){
           /* still before crossloop begins */
           memcpy(out,A,bpf);
           A+=bpf;
@@ -1776,8 +1776,8 @@ void fill_fragment1(unsigned char *out, pcm_t *pcm, off_t start, off_t *pos, off
           /* crosslooping */
           float w = fadewindow1[lp];
           for(j=0;j<cpf;j++){
-            float val = get_val(A,bps)*(1.-w) + get_val(B,bps)*w;
-            put_val(out,val,bps);
+            float val = get_val(A,bps)*(1.f-w) + get_val(B,bps)*w;
+            put_val(out,bps,val);
             A+=bps;
             B+=bps;
             out+=bps;
@@ -1791,7 +1791,7 @@ void fill_fragment1(unsigned char *out, pcm_t *pcm, off_t start, off_t *pos, off
       unsigned char *A = pcm->data+*pos;
       memcpy(out,A,fragsize);
       *loop=0;
-      *pos=A-pcm->data+fragsize;
+      *pos+=fragsize;
     }
   }
 }
@@ -1805,10 +1805,10 @@ void fill_fragment2(unsigned char *out, pcm_t *pcm, off_t start, off_t *pos, off
   int fragsize=fragsamples*bpf;
 
   /* guard limits here */
-  if(end<fragsize)end=fragsize;
+  if(end<fragsize*3)end=fragsize*3;
   if(end>pcm->size)end=pcm->size;
   if(start<0)start=0;
-  if(start>pcm->size-fragsize)start=pcm->size-fragsize;
+  if(start>pcm->size-fragsize*3)start=pcm->size-fragsize*3;
 
   /* loop is never in progress for a fill_fragment2; called only during a seek crosslap */
   unsigned char *A = pcm->data+*pos;
@@ -2272,15 +2272,18 @@ int main(int argc, char **argv){
           if(restart_mode>2)restart_mode=0;
           break;
         case 's':
-          if(current_pos<end_pos)
-            start_pos=current_pos;
+          start_pos=current_pos;
+          if(start_pos<0)start_pos=0;
+          if(start_pos>pcm[0]->size-fragsize*3)
+            start_pos=pcm[0]->size-fragsize*3;
           break;
         case 'S':
           start_pos=0;
           break;
         case 'e':
-          if(current_pos>start_pos)
-            end_pos=current_pos;
+          end_pos=current_pos;
+          if(end_pos<fragsize*3)end_pos=fragsize*3;
+          if(end_pos>pcm[0]->size)end_pos=pcm[0]->size;
           break;
         case 'E':
           end_pos=pcm[0]->size;
