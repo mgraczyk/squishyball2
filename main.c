@@ -2265,8 +2265,10 @@ int main(int argc, char **argv){
 
 
       /* update terminal */
-
-
+      {
+        double current = (double)current_pos/(pcm[0]->ch*(pcm[0]->bits+7)/8*pcm[0]->rate);
+        panel_update_current(current);
+      }
 
       if(state.fragment_size==0 && !state.exiting){
         /* fill audio output */
@@ -2387,17 +2389,15 @@ int main(int argc, char **argv){
     }
   }
 
-  /* done */
+  /* tear down terminal */
+  min_remove_panel();
+
   /* join */
   pthread_cond_signal(&state.play_cond);
   pthread_cancel(fd_handle);
   pthread_mutex_unlock(&state.mutex);
   pthread_join(playback_handle,NULL);
   pthread_join(fd_handle,NULL);
-
-  /* tear down terminal */
-  min_remove_panel();
-
 
   for(i=0;i<test_files;i++)
     free_pcm(pcm[i]);

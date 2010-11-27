@@ -41,15 +41,13 @@ struct pcm_struct {
 extern char *make_time_string(double s,int pad);
 extern void panel_init(pcm_t **pcm, int test_files, int test_mode, double start, double end, double size,
                        int flip_mode,int repeat_mode,int trials,char *trial_list);
-extern void panel_update_playing(char c);
+extern void panel_update_playing(int n);
 extern void panel_update_start(double time);
 extern void panel_update_current(double time);
 extern void panel_update_end(double time);
 extern void panel_update_repeat_mode(int mode);
 extern void panel_update_flip_mode(int mode);
 extern void panel_update_trials(char *trial_list);
-extern void panel_update_sample(int n);
 extern void panel_update_pause(int flag);
-
 
 #endif
