@@ -2392,7 +2392,7 @@ int main(int argc, char **argv){
           }
         }
 
-        if(paused){
+        if(paused && !do_pause){
           current_sample=randomize[current_choice];
           memset(fragmentA,0,fragsize);
           if(do_seek){
