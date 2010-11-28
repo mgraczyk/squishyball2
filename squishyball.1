@@ -7,7 +7,7 @@
 squishyball \- perform sample comparison testing on the command line
 
 .SH SYNOPSIS
-.B squishyball 
+.B squishyball
 [\fIoptions\fR] fileA [fileB [[\fB-c\fR] \fIfileN...\fR]]
 
 .SH DESCRIPTION
@@ -17,7 +17,7 @@ A/B/X or X/X/Y testing on the command line.  The user specifies two
 input files to be compared and uses the keyboard during playback to
 flip between the randomized samples to perform on-the-fly comparisons.
 After a predetermined number of trials,
-.B squishyball 
+.B squishyball
 prints the trial results to the terminal and exits.
 
 .B squishyball
@@ -66,9 +66,9 @@ If a number, output to Nth available sound device.  If a device name,
 use output device matching that device name.  The backend audio driver is
 selected automatically based on the device name provided.
 .IP "\fB-D --force-dither"
-Always use dither when down-converting to 16-bit samples for playback 
-on audio devices that do not support 24-bit playback. By default, 
-uncompressed samples are always dithered, but lossy formats (such 
+Always use dither when down-converting to 16-bit samples for playback
+on audio devices that do not support 24-bit playback. By default,
+uncompressed samples are always dithered, but lossy formats (such
 as Vorbis) are simply rounded.  See the section \fBCONVERSION AND DITHER
 \fRbelow for more details.
 .IP "\fB-e --end-time \fR[[\fIhh\fB:\fR]\fImm\fB:\fR]\fIss\fR[\fB.\fIff\fR]"
@@ -100,7 +100,7 @@ Produce more and more detailed progress information and warnings.
 Print version and exit.
 
 .SH KEYBOARD INTERACTION
-.IP "\fBa\fR, \fBb\fR, \fBx"  
+.IP "\fBa\fR, \fBb\fR, \fBx"
 Switch between A and B samples (A/B mode), or A, B and X samples (A/B/X mode).
 .IP "\fBA\fR, \fBB"
 Select A or B as preferred sample (A/B mode), or sample A or sample B as
@@ -146,13 +146,13 @@ Abort testing early.
 8-, 16-, 24-bit linear integer PCM
 .IP \fBFLAC/OggFLAC
 16- and 24-bit
-.IP \fBSW 
+.IP \fBSW
 Mono signed 16-bit little endian raw with a .sw extension
 .IP \fBOggVorbis
 all Vorbis I files
 
 .SH CONVERSION AND DITHER
-\fBsquishyball \fRloads all linear PCM file types at native bit depth. 
+\fBsquishyball \fRloads all linear PCM file types at native bit depth.
 Uncompressed floating point files (eg, 32 bit floating point WAV) are
 converted to 24-bit integer PCM.  Ogg Vorbis files are also decoded to
 24-bit.
@@ -164,13 +164,45 @@ playback is available and at least one sample is 24-bit, all samples
 are promoted to 24 bits. If 24-bit playback is unavailable, 24-bit samples
 are demoted to 16 bits.
 
-Floating point samples (32-bit) are not dithered when converting to 24-bit. 
-24-bit and floating point (32 bit) samples are dithered using a TPDF 
+Floating point samples (32-bit) are not dithered when converting to 24-bit.
+24-bit and floating point (32 bit) samples are dithered using a TPDF
 when down-conversion to 16-bit is necessary.  Lossy-encoded samples (eg
 Ogg Vorbis files) are an exception; they are not dithered by default during
-down-conversion. This behavior can be overridden by \fB-D\fR, 
+down-conversion. This behavior can be overridden by \fB-D\fR,
 which forces dithering for lossy files as well.  Down-conversion
 dithering can be disabled for all input types with \fB-t\fR.
+
+.SH IMPORTANT USAGE NOTES
+.IP "\fBPlayback Depth and Rate"
+
+Many modern audio playback systems (such as PulseAudio or the
+ALSA 'default' device) give no means of determining if the requested
+playback paramters are actually being used by the hardware, or if the
+audio system is helpfully converting everything to some other
+supported depth/rate.  When using these systems, \fBsquishyball\fR has no
+way of knowing if 16-/24-bit playback or sample rate is being
+honored. Automatic conversion will almost always negatively affect
+sample quality.
+
+.IP "\fBFlip-Mode Choice"
+
+\fBSilent Mode\fR smoothly transitions between samples.  It allows
+the most direct comparison between signals without any intevening
+auditory distraction. However, the temporary combination of different
+signals may cause unintended cancellation and comb-filtering effects that can
+give away the 'unknown' sample just as a 'pop' would.
+
+\fBMark Mode\fR quickly fades to silence before flipping to another
+sample, marking the transition.  Because the samples never overlap,
+crosslap artifacts cannot contaminate trial results.  However, the
+audible dip between samples can distract from listening, potentially
+making it slightly more difficult to detect legitimate artifacts.
+
+\fBBeep Mode\fR smoothly crosslaps samples, momentarily attenuates
+the transition, and adds a soft 'beep' to mark where the transition
+occurs.  It makes the transition point especially obvious, but may
+occasionally suffer from both crosslap artifacts (as in Silent mode)
+and momentary distraction (as in Mark mode).
 
 .SH AUTHORS
 Monty <monty@xiph.org>
@@ -178,4 +210,4 @@ Monty <monty@xiph.org>
 .SH "SEE ALSO"
 
 .PP
-\fBabx-comparator\fR(1), \fBogg123\fR(1), \fBoggdec\fR(1), \fBflac\fR(1)
+\fBabx-comparator\fR(1), \fBrateit\fR(1), \fBogg123\fR(1), \fBoggdec\fR(1), \fBflac\fR(1)
