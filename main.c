@@ -435,8 +435,8 @@ int main(int argc, char **argv){
     /* Are all samples the same number of channels?  If not, bail. */
     if(pcm[0]->ch != pcm[i]->ch){
       fprintf(stderr,"Input channel counts do not match!\n"
-              "\t%s: %dHz\n"
-              "\t%s: %dHz\n"
+              "\t%s: %d channels\n"
+              "\t%s: %d channels\n"
               "Aborting\n",pcm[0]->path,pcm[0]->ch,pcm[i]->path,pcm[i]->ch);
       exit(3);
     }
