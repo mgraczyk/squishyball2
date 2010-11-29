@@ -157,8 +157,8 @@ static void draw_timebar(int row){
 }
 
 static void draw_playbar(int row){
-  int pre = rint(p_st/p_len*columns);
-  int post = rint((p_len-p_end)/p_len*columns);
+  int pre = floor(p_st/p_len*columns);
+  int post = columns-floor(p_end/p_len*columns);
   int i;
   playrow=row;
 
@@ -354,8 +354,8 @@ void panel_update_current(double time){
     min_putchar(' ');
 
     if(was!=now || force){
-      int pre = rint(p_st/p_len*columns);
-      int post = rint((p_len-p_end)/p_len*columns);
+      int pre = floor(p_st/p_len*columns);
+      int post = columns-floor(p_end/p_len*columns);
 
       min_bold(1);
       min_gfx(1);
