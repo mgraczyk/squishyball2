@@ -178,7 +178,7 @@ static int parse_time(char *s,double *t){
 }
 
 int randrange(int range){
-  return (int)floor(range * rand()/(RAND_MAX+1.0));
+  return (int)floor(rand()/(RAND_MAX+1.0)*range);
 }
 
 void randomize_samples(int *r,int *cchoice, int test_mode){
