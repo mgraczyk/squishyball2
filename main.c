@@ -383,9 +383,17 @@ int main(int argc, char **argv){
       break;
     case 'e':
       parse_time(optarg,&end);
+      if(end<=0){
+        fprintf(stderr,"Error parsing argument to -e\n");
+        exit(1);
+      }
       break;
     case 's':
       parse_time(optarg,&start);
+      if(start<=0){
+        fprintf(stderr,"Error parsing argument to -s\n");
+        exit(1);
+      }
       break;
     case 'r':
       restart_mode=1;
@@ -514,41 +522,15 @@ int main(int argc, char **argv){
   fragsamples=setup_windows(pcm,test_files,
                             &fadewindow1,&fadewindow2,&fadewindow3,&beep1,&beep2);
 
-  /* set up terminal */
-  atexit(min_panel_remove);
-  {
-    double len=pcm[0]->size/((pcm[0]->bits+7)/8)/pcm[0]->ch/(double)pcm[0]->rate;
-    panel_init(pcm, test_files, test_mode, start, end>0 ? end : len, len,
-               beep_mode, restart_mode, tests, "");
-  }
-
-  /* set up shared state */
-  memset(&state,0,sizeof(state));
-  pthread_mutex_init(&state.mutex,NULL);
-  pthread_cond_init(&state.main_cond,NULL);
-  pthread_cond_init(&state.play_cond,NULL);
-  pthread_cond_init(&state.key_cond,NULL);
-  state.adev=adev;
-
-  /* fire off helper threads */
-  if(pthread_create(&playback_handle,NULL,playback_thread,&state)){
-    fprintf(stderr,"Failed to create playback thread.\n");
-    exit(7);
-  }
-  if(pthread_create(&fd_handle,NULL,key_thread,&state)){
-    fprintf(stderr,"Failed to create playback thread.\n");
-    exit(7);
-  }
 
   /* casual mode is not randomized */
   for(i=0;i<MAXFILES;i++)
     randomize[i]=i;
+
   /* randomize samples for first trial */
   srandom(time(NULL)+getpid());
   randomize_samples(randomize,&cchoice,test_mode);
 
-  /* playback loop */
-  pthread_mutex_lock(&state.mutex);
   {
     int current_sample=randomize[0];
     int current_choice=0;
@@ -568,8 +550,51 @@ int main(int argc, char **argv){
     off_t end_pos=(end>0?rint(end*rate*bpf):size);
     off_t current_pos;
     int paused=0;
-
+    double len=pcm[0]->size/((pcm[0]->bits+7)/8)/pcm[0]->ch/(double)pcm[0]->rate;
     fragsize=fragsamples*bpf;
+
+    /* guard start/end params */
+    if(end>=0 && start>=end){
+      fprintf(stderr,"Specified start and end times must not overlap.\n");
+      exit(1);
+    }
+
+    if(end>len){
+      fprintf(stderr,"Specified end time beyond end of playback.\n");
+      exit(1);
+    }
+
+    if(start>=len){
+      fprintf(stderr,"Specified start time beyond end of playback.\n");
+      exit(1);
+    }
+
+    /* set up terminal */
+    atexit(min_panel_remove);
+    panel_init(pcm, test_files, test_mode, start, end>0 ? end : len, len,
+               beep_mode, restart_mode, tests, "");
+
+    /* set up shared state */
+    memset(&state,0,sizeof(state));
+    pthread_mutex_init(&state.mutex,NULL);
+    pthread_cond_init(&state.main_cond,NULL);
+    pthread_cond_init(&state.play_cond,NULL);
+    pthread_cond_init(&state.key_cond,NULL);
+    state.adev=adev;
+
+    /* fire off helper threads */
+    if(pthread_create(&playback_handle,NULL,playback_thread,&state)){
+      fprintf(stderr,"Failed to create playback thread.\n");
+      exit(7);
+    }
+    if(pthread_create(&fd_handle,NULL,key_thread,&state)){
+      fprintf(stderr,"Failed to create playback thread.\n");
+      exit(7);
+    }
+
+    /* prpare playback loop */
+    pthread_mutex_lock(&state.mutex);
+
     fragmentA=calloc(fragsize,1);
     fragmentB=calloc(fragsize,1);
     if(!fragmentA || !fragmentB){
