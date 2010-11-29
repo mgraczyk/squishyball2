@@ -177,24 +177,27 @@ static int parse_time(char *s,double *t){
   return 0;
 }
 
+int randrange(int range){
+  return (int)floor(range * rand()/(RAND_MAX+1.0));
+}
+
 void randomize_samples(int *r,int *cchoice, int test_mode){
   switch(test_mode){
   case 1:
     r[0] = 0;
     r[1] = 1;
-    r[2] = random()&1;
+    r[2] = randrange(2);
     *cchoice = (r[1]==r[2] ? 1 : 0);
     break;
   case 0:
-    r[0] = random()&1;
+    r[0] = randrange(2);
     r[1] = 1-r[0];
     *cchoice = 1;
     break;
   case 2:
     r[0] = r[1] = r[2] = 0;
-    r[random()%3] = 1;
-    if (random()&1)
-    {
+    r[randrange(3)] = 1;
+    if (randrange(2)){
       r[0] = 1-r[0];
       r[1] = 1-r[1];
       r[2] = 1-r[2];
