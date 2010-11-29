@@ -1,24 +1,26 @@
 .\" Process this file with
 .\" groff -man -Tascii squishyball.1
 .\"
-.TH squishyball 1 "2010 November 18" "Xiph.Org Foundation" "Xiph Evaluation Tools"
+.TH squishyball 1 "2010 November 29" "Xiph.Org Foundation" "Xiph Evaluation Tools"
 
 .SH NAME
 squishyball \- perform sample comparison testing on the command line
 
 .SH SYNOPSIS
 .B squishyball
-[\fIoptions\fR] fileA [fileB [[\fB-c\fR] \fIfileN...\fR]]
+[\fIoptions\fR] fileA [fileB [[\fB-c\fR] \fIfileN...\fR]] [> results.txt]
 
 .SH DESCRIPTION
 .B squishyball
-is a simple command-line application used to perform double-blind A/B,
+is a simple command-line utility for performing double-blind A/B,
 A/B/X or X/X/Y testing on the command line.  The user specifies two
 input files to be compared and uses the keyboard during playback to
 flip between the randomized samples to perform on-the-fly comparisons.
 After a predetermined number of trials,
 .B squishyball
-prints the trial results to the terminal and exits.
+prints the trial results to stdout and exits.  Results (stdout) may be
+redirected to a file without affecting interactive use of the
+terminal.
 
 .B squishyball
 can also be used to perform casual, non-randomized comparisons of
