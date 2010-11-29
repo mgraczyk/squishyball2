@@ -26,7 +26,7 @@ groups of up to ten samples; this is the default mode of operation.
 
 .SH TEST TYPES
 .IP "\fB-a --ab"
-Perform randomized A/B test on two input samples.
+Perform A/B test on two input samples.
 
 A/B testing randomizes the order of two input samples and presents
 them, unnamed, as sample 'A' and sample 'B'.  In each trial the user
@@ -34,15 +34,21 @@ selects A or B as the preferred sample.  The samples are then
 re-randomized for the next trial.  This test is useful for
 establishing relative or preferred quality between two samples.
 .IP "\fB-b --abx"
-Perform randomized A/B/X test on two input samples.
+Perform A/B/X test on two input samples.
 
-A/B/X testing randomizes the order of two input samples and presents
-them, unnamed, as sample 'A' and sample 'B'.  A third sample 'X' is
-also chosen randomly from either either 'A' or 'B'.  In each trial, the
-user selects A or B as the sample believed to be the same as X. All
-samples are then re-randomized for the next trial. This test is useful
-for determining if any differences are audible between two samples and
-to what confidence level.
+A/B/X presents two input samples, unrandomized, as sample 'A' and
+sample 'B'.  A third sample 'X' is chosen randomly from either 'A'
+or 'B'.  In each trial, the user selects A or B as the sample believed
+to be the same as X. X is then re-randomized for the next trial. This
+test is useful for determining if any differences are audible between
+two samples and to what confidence level.
+
+Note that because the A and B samples are not randomized (they are
+presented in the order given on the command line as per standard
+industry practice), an A/B/X test does not eliminate ordering bias.
+A stronger version of this test that randomizes all samples is the
+X/X/Y test below.
+
 .IP "\fB-c --casual"
 Perform casual comparison of up to ten samples (default).
 
@@ -52,12 +58,15 @@ forth within a group of up to ten samples.
 .IP "\fB-x --xxy"
 Perform randomized X/X/Y test on two input samples.
 
-X/X/Y testing is a form of A/B/X testing in which the position of the 'X'
-sample is not known ahead of time to be in the third position. In each trial,
-the user selects which of sample 1, 2 or 3 is believed to be the
-sample that is different from the other two. This test is useful for
-determining if any differences are audible between two samples and to
-what confidence level.
+X/X/Y testing is a form of A/B/X testing in which the order of all
+samples is randomized and the position of the 'X' sample is not known
+ahead of time to be in the third position. In each trial, the user
+selects which of sample 1, 2 or 3 is believed to be the sample that is
+different from the other two. This test is useful for determining if
+any differences are audible between two samples and to what confidence
+level.  It is a stronger version of the A/B/X test that eliminates
+sample order bias.
+
 .SH OTHER OPTIONS
 .IP "\fB-B --beep-flip"
 Mark transitions between samples with a short beep.

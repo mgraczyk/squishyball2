@@ -78,8 +78,8 @@ void usage(FILE *out){
           "USAGE:\n"
           "  squishyball [options] fileA [fileB [[-c] fileN...]]\n\n"
           "OPTIONS:\n"
-          "  -a --ab                : Perform randomized A/B test\n"
-          "  -b --abx               : Perform randomized A/B/X test\n"
+          "  -a --ab                : Perform A/B test\n"
+          "  -b --abx               : Perform A/B/X test\n"
           "  -B --beep-flip         : Mark transitions between samples with\n"
           "                           a short beep\n"
           "  -c --casual            : casual mode; load up to ten\n"
@@ -116,7 +116,7 @@ void usage(FILE *out){
           "                           playback.\n"
           "  -v --verbose           : Produce more progress information.\n"
           "  -V --version           : Print version and exit.\n"
-          "  -x --xxy               : Perform randomized X/X/Y test.\n"
+          "  -x --xxy               : Perform X/X/Y (triangle) test.\n"
           "\n"
           "INTERACTION:\n"
           "    a b x    : Switch playback between A, B [and X] samples.\n"
@@ -180,8 +180,8 @@ static int parse_time(char *s,double *t){
 void randomize_samples(int *r,int *cchoice, int test_mode){
   switch(test_mode){
   case 1:
-    r[0] = random()&1;
-    r[1] = 1-r[0];
+    r[0] = 0;
+    r[1] = 1;
     r[2] = random()&1;
     *cchoice = (r[1]==r[2] ? 1 : 0);
     break;
