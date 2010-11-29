@@ -799,7 +799,7 @@ int main(int argc, char **argv){
             seek_to += start_pos-current_pos;
             do_seek=1;
           }
-          current_choice=0;
+          //current_choice=0;
 
           if(tests_cursor==tests){
             pthread_mutex_lock(&state.mutex);
