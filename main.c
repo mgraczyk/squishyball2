@@ -191,14 +191,16 @@ void randomize_samples(int *r,int *cchoice, int test_mode){
     *cchoice = 1;
     break;
   case 2:
-    r[0] = random()&1;
-    r[1] = random()&1;
-    if(r[0] == r[1])
-      r[2]=1-r[0];
-    else
-      r[2] = random()&1;
-    break;
+    r[0] = r[1] = r[2] = 0;
+    r[random()%3] = 1;
+    if (random()&1)
+    {
+      r[0] = 1-r[0];
+      r[1] = 1-r[1];
+      r[2] = 1-r[2];
+    }
     *cchoice = (r[0]==r[1] ? 2 : (r[1]==r[2] ? 0 : 1));
+    break;
   }
 }
 
