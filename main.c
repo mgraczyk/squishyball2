@@ -612,6 +612,11 @@ int main(int argc, char **argv){
           do_flip=1;
           /* range checking enforced later */
           break;
+        case 10: /* enter */
+          /* guarded below */
+          flip_to = current_choice;
+          do_select=1;
+          break;
         case '0': case '9': case '8': case '7': case '6':
         case '5': case '4': case '3': case '2': case '1':
           flip_to=c-'1';
