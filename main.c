@@ -899,7 +899,7 @@ int main(int argc, char **argv){
       }
 
       /* wait */
-      if(!state.key_waiting && state.fragment_size>0)
+      if((!state.key_waiting || do_flip || do_pause || do_select) && state.fragment_size>0)
         pthread_cond_wait(&state.main_cond,&state.mutex);
     }
   }
@@ -948,6 +948,13 @@ int main(int argc, char **argv){
 
   pthread_join(playback_handle,NULL);
   pthread_join(fd_handle,NULL);
+  free(fadewindow1);
+  free(fadewindow2);
+  free(fadewindow3);
+  free(beep1);
+  free(beep2);
+  free(fragmentA);
+  free(fragmentB);
   for(i=0;i<test_files;i++)
     free_pcm(pcm[i]);
   return 0;
