@@ -504,7 +504,17 @@ void panel_update_playing(int n){
       switch(p_tm){
       case 0: /* AB */
       case 1: /* ABX */
-        min_putchar(p_pl+'A');
+        switch(p_pl){
+        case 0:
+          min_putchar('A');
+          break;
+        case 1:
+          min_putchar('B');
+          break;
+        case 2:
+          min_putchar('X');
+          break;
+        }
         break;
       case 2: /* XXY*/
       case 3: /* Casual */
