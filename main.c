@@ -47,7 +47,7 @@
 #define MAXFILES 10
 int sb_verbose=0;
 
-char *short_options="abcd:De:hn:rRs:tvVxBMS";
+char *short_options="abcd:De:hn:rRs:tvVxBMSg";
 
 struct option long_options[] = {
   {"ab",no_argument,0,'a'},
@@ -57,6 +57,8 @@ struct option long_options[] = {
   {"device",required_argument,0,'d'},
   {"force-dither",no_argument,0,'D'},
   {"end-time",no_argument,0,'e'},
+  {"gabbagabbahey",no_argument,0,'g'},
+  {"score-display",no_argument,0,'g'},
   {"help",no_argument,0,'h'},
   {"mark-flip",no_argument,0,'M'},
   {"trials",required_argument,0,'n'},
@@ -97,6 +99,10 @@ void usage(FILE *out){
           "                           a dithered by default during down-\n"
           "                           conversion.\n"
           "  -e --end-time <time>   : Set sample end time for playback\n"
+          "  -g --gabbagabbahey     : Display a running trials score along\n"
+          "                           with indicating if each trial choice\n"
+          "                           was correct or incorrect.  Disables\n"
+          "                           undo/redo.\n"
           "  -h --help              : Print this usage information.\n"
           "  -M --mark-flip         : Mark transitions between samples with\n"
           "                           a short period of silence\n"
@@ -330,6 +336,7 @@ int main(int argc, char **argv){
   char sample_list[MAXTRIALS];
   int  tests_cursor=0;
   int  tests_total=0;
+  int  running_score=0;
 
   /* parse options */
 
@@ -407,10 +414,18 @@ int main(int argc, char **argv){
     case 'V':
       fprintf(stdout,"%s\n",VERSION);
       exit(0);
+    case 'g':
+      running_score=1;
+      break;
     default:
       usage(stderr);
       exit(1);
     }
+  }
+
+  if(running_score && test_mode==3){
+    fprintf(stderr,"-g is meaningless in casual comparison mode.\n");
+    exit(1);
   }
 
   /* Verify stdin is a tty! */
@@ -703,7 +718,7 @@ int main(int argc, char **argv){
           do_seek=1;
           break;
         case KEY_BACKSPACE:
-          seek_to=start_pos;
+          seek_to=start_pos-current_pos;
           do_seek=1;
           break;
         case 'f':
