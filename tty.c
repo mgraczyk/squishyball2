@@ -158,7 +158,7 @@ static void draw_timebar(int row){
 
 static void draw_playbar(int row){
   int pre = floor(p_st/p_len*columns);
-  int post = columns-floor(p_end/p_len*columns);
+  int post = columns-floor(p_end/p_len*columns+1.e-6f);
   int i;
   playrow=row;
 
@@ -285,6 +285,7 @@ void panel_redraw_full(void){
 
 void panel_init(pcm_t **pcm, int test_files, int test_mode, double start, double end, double size,
                 int flip_mode,int repeat_mode,int trials,char *trial_list){
+
   if(min_panel_init(test_mode==3 ? test_files+6:7)){
     fprintf(stderr,"Unable to initialize terminal (possibly insufficient lines)\n");
     exit(101);
@@ -332,9 +333,12 @@ void panel_update_start(double time){
     }
     min_putchar(' ');
     draw_playbar(playrow);
-    force=1;
-    panel_update_current(p_cur);
-    force=0;
+    {
+      int temp=force;
+      force=1;
+      panel_update_current(p_cur);
+      force=temp;
+    }
   }
 }
 
@@ -355,7 +359,7 @@ void panel_update_current(double time){
 
     if(was!=now || force){
       int pre = floor(p_st/p_len*columns);
-      int post = columns-floor(p_end/p_len*columns);
+      int post = columns-floor(p_end/p_len*columns+1.e-6f);
 
       min_bold(1);
       min_gfx(1);
@@ -378,8 +382,8 @@ void panel_update_current(double time){
         min_bg(COLOR_BLACK);
       }
       min_putchar(ACS_VLINE);
+      min_unset();
     }
-    min_unset();
     min_flush();
   }
 }
@@ -399,9 +403,12 @@ void panel_update_end(double time){
     }
     min_putchar(' ');
     draw_playbar(playrow);
-    force=1;
-    panel_update_current(p_cur);
-    force=0;
+    {
+      int temp=force;
+      force=1;
+      panel_update_current(p_cur);
+      force=temp;
+    }
   }
 }
 
