@@ -649,6 +649,9 @@ int main(int argc, char **argv){
       int c;
       if(state.exiting) break;
 
+      if((!state.key_waiting || do_flip || do_pause || do_select) && state.fragment_size>0)
+        pthread_cond_wait(&state.main_cond,&state.mutex);
+
       /* seeks and some other ops are batched */
       if(state.key_waiting && !do_flip && !do_pause && !do_select){
         /* service keyboard */
@@ -970,10 +973,6 @@ int main(int argc, char **argv){
         state.fragment_size=fragsize;
         pthread_cond_signal(&state.play_cond);
       }
-
-      /* wait */
-      if((!state.key_waiting || do_flip || do_pause || do_select) && state.fragment_size>0)
-        pthread_cond_wait(&state.main_cond,&state.mutex);
     }
   }
 
