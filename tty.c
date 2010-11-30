@@ -713,8 +713,10 @@ void panel_toggle_keymap(){
     min_mvcur(x,o++);
     min_putstrb("        <enter> ");
     min_putstr (": Choose current ");
-    min_putstrb("      <ins/del> ");
-    min_putstr (": Undo/redo trial");
+    if(!p_g){
+      min_putstrb("      <ins/del> ");
+      min_putstr (": Undo/redo trial");
+    }
     min_mvcur(x,o++);
     min_putstrb("   <left/right> ");
     min_putstr (": Seek           ");
