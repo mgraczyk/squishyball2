@@ -25,7 +25,7 @@
 #define _SB__H_
 #include <ao/ao.h>
 
-#define MAXTRIALS 50
+#define MAXTRIALS 150
 typedef struct pcm_struct pcm_t;
 
 struct pcm_struct {
@@ -62,14 +62,16 @@ extern ao_device *setup_playback(int rate, int ch, int bits, char *matrix, char 
 
 extern char *make_time_string(double s,int pad);
 extern void panel_init(pcm_t **pcm, int test_files, int test_mode, double start, double end, double size,
-                       int flip_mode,int repeat_mode,int trials,char *trial_list);
+                       int flip_mode,int repeat_mode,int trials,int gabba);
 extern void panel_update_playing(int n);
 extern void panel_update_start(double time);
 extern void panel_update_current(double time);
 extern void panel_update_end(double time);
 extern void panel_update_repeat_mode(int mode);
 extern void panel_update_flip_mode(int mode);
-extern void panel_update_trials(char *trial_list, int n);
+extern void panel_update_trials(char *trial_list, char *trial_correct, int n);
 extern void panel_update_pause(int flag);
 extern void panel_toggle_keymap(void);
+extern double compute_psingle(int correct, int tests);
+extern double compute_pdual(int count, int tests);
 #endif

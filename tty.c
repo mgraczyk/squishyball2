@@ -28,6 +28,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <limits.h>
 #include <unistd.h>
 #include <math.h>
 #include <errno.h>
@@ -35,9 +36,9 @@
 #include "mincurses.h"
 
 static int force=0;
-static int p_tm,p_ch,p_b,p_r,p_fm,p_rm,pcm_n,p_tr,p_tmax,p_pau,p_pl,p_tn;
+static int p_tm,p_ch,p_b,p_r,p_fm,p_rm,pcm_n,p_tr,p_tmax,p_pau,p_pl,p_tn,p_g;
 static double p_st,p_cur,p_end,p_len;
-static char p_tl[MAXTRIALS];
+static char p_tl[MAXTRIALS],p_tc[MAXTRIALS];
 static pcm_t **pcm_p;
 
 static char timebuffer[80];
@@ -80,7 +81,7 @@ static int toprow;
 static int boxrow;
 static int fliprow;
 
-static void draw_topbar(int row){
+static int draw_topbar(int row){
   char buf[columns+1];
   int i=0,j;
   toprow=row;
@@ -136,9 +137,10 @@ static void draw_topbar(int row){
     min_putchar(ACS_HLINE);
   min_putchar(ACS_LLCORNER);
   min_unset();
+  return 2;
 }
 
-static void draw_timebar(int row){
+static int draw_timebar(int row){
   char buf[columns+1];
   timerow=row;
 
@@ -155,9 +157,10 @@ static void draw_timebar(int row){
     char *time=make_time_string(p_len,1);
     min_putstr(time);
   }
+  return 1;
 }
 
-static void draw_playbar(int row){
+static int draw_playbar(int row){
   int pre = floor(p_st/p_len*columns);
   int post = columns-floor(p_end/p_len*columns+1.e-6f);
   int i;
@@ -181,12 +184,13 @@ static void draw_playbar(int row){
     i++;
   }
   min_unset();
+  return 1;
 }
 
-static void draw_trials_box(int row){
+static int draw_trials_box(int row){
+  int i;
   char buf[columns+1];
   boxrow=row;
-  fliprow=row+2;
 
   /* top line of box */
   fill(buf,ACS_HLINE,columns);
@@ -196,22 +200,28 @@ static void draw_trials_box(int row){
   min_gfx(1);
   min_fg(COLOR_CYAN);
   min_putstr(buf);
+  row++;
 
-  /* trials line */
-  min_mvcur(0,row+1);
-  min_putchar(ACS_VLINE);
-  min_mvcur(columns-1,row+1);
-  min_putchar(ACS_VLINE);
+  /* trials line[s] */
+  for(i=0;i<1+(p_g?1:0);i++){
+    min_mvcur(0,row);
+    min_putchar(ACS_VLINE);
+    min_mvcur(columns-1,row);
+    min_putchar(ACS_VLINE);
+    row++;
+  }
 
-  min_mvcur(0,row+2);
+  fliprow=row;
+  min_mvcur(0,row);
   fill(buf,ACS_HLINE,columns);
   buf[0]=ACS_LLCORNER;
   buf[columns-1]=ACS_LRCORNER;
   min_putstr(buf);
   min_unset();
+  return (p_g?1:0)+3;
 }
 
-static void draw_samples_box(int row){
+static int draw_samples_box(int row){
   char buf[columns+1];
   int i;
   boxrow=row;
@@ -255,20 +265,19 @@ static void draw_samples_box(int row){
   buf[columns-1]=ACS_LRCORNER;
   min_putstr(buf);
   min_unset();
+  return p_tn+2;
 }
 
 void panel_redraw_full(void){
   int i=2;
 
   if(p_tm==3){
-    draw_samples_box(i);
-    i+=pcm_n+2;
+    i+=draw_samples_box(i);
   }else{
-    draw_trials_box(i);
-    i+=3;
+    i+=draw_trials_box(i);
   }
-  draw_playbar(i++);
-  draw_timebar(i++);
+  i+=draw_playbar(i);
+  i+=draw_timebar(i);
   draw_topbar(1);
   force=1;
   panel_update_pause(p_pau);
@@ -279,15 +288,15 @@ void panel_redraw_full(void){
   panel_update_repeat_mode(p_rm);
   panel_update_flip_mode(p_fm);
   if(p_tm!=3)
-    panel_update_trials(p_tl,p_tn);
+    panel_update_trials(p_tl,p_tc,p_tn);
   force=0;
   min_flush();
 }
 
 void panel_init(pcm_t **pcm, int test_files, int test_mode, double start, double end, double size,
-                int flip_mode,int repeat_mode,int trials,char *trial_list){
+                int flip_mode,int repeat_mode,int trials,int gabba){
 
-  if(min_panel_init(test_mode==3 ? test_files+6:7)){
+  if(min_panel_init((test_mode==3 ? test_files+6:7) + (gabba ? 1:0))){
     fprintf(stderr,"Unable to initialize terminal (possibly insufficient lines)\n");
     exit(101);
   }
@@ -314,6 +323,7 @@ void panel_init(pcm_t **pcm, int test_files, int test_mode, double start, double
   pcm_n=test_files;
   pcm_p=pcm;
   p_pau=0;
+  p_g=gabba;
 
   min_hidecur();
   panel_redraw_full();
@@ -463,7 +473,20 @@ void panel_update_flip_mode(int mode){
   }
 }
 
-void panel_update_trials(char *choices, int n){
+char *dottrim(char *in, int l){
+  int m=strlen(in);
+  if(m>l){
+    if(l<1)return "";
+    if(l<2)return ".";
+    if(l<3)return "..";
+    if(l<4)return "...";
+    in+=m-l;
+    in[0]=in[1]=in[2]='.';
+  }
+  return in;
+}
+
+void panel_update_trials(char *choices, char *correct, int n){
   if(force || n!=p_tn || memcmp(p_tl,choices,n)){
     char buf[columns+1];
     int i;
@@ -474,15 +497,112 @@ void panel_update_trials(char *choices, int n){
     min_putstr(buf);
 
     memcpy(p_tl,choices,n);
-    for(i=0;i<n;i++)
+    memcpy(p_tc,correct,n);
+
+    if(n>columns-strlen(buf)-3){
+      min_fg(COLOR_CYAN);
+      min_putstr("...");
+      i=n-columns+strlen(buf)+6;
+    }else{
+      i=0;
+    }
+    for(;i<n;i++){
+      if(p_g){
+        if(correct[i]==0){
+          if(p_tm==0){
+            min_fg(COLOR_MAGENTA);
+          }else{
+            min_fg(COLOR_RED);
+          }
+        }else{
+          if(p_tm==0){
+            min_fg(COLOR_CYAN);
+          }else{
+            min_fg(COLOR_GREEN);
+          }
+        }
+      }
+
       if(p_tm<2){
         min_putchar(p_tl[i]+'A');
       }else{
         min_putchar(p_tl[i]+'1');
       }
+    }
+    min_unset();
     i+=strlen(buf);
     for(;i<columns-2;i++)
       min_putchar(' ');
+
+    if(p_g){
+      int count=0;
+      for(i=0;i<n;i++)
+        count+=correct[i];
+
+      min_mvcur(1,boxrow+2);
+      if(p_tm==0){
+        /* A/B */
+        int col = columns - 4, Ac, Bc;
+        char bufA[PATH_MAX];
+        char bufB[PATH_MAX];
+        char bufAn[10];
+        char bufBn[10];
+        char *Ap=bufA,*Bp=bufB;
+        double p=compute_pdual(count,n);
+        snprintf(bufA,PATH_MAX,"%s: ",pcm_p[0]->path);
+        snprintf(bufB,PATH_MAX,"%s: ",pcm_p[1]->path);
+        snprintf(bufAn,10,"%d ",n-count);
+        snprintf(bufBn,10,"%d ",count);
+        if(n>1)
+          sprintf(buf," p': %.2g ",(float)p);
+        else
+          sprintf(buf," p': --- ");
+        col-=strlen(buf);
+        Ac=strlen(bufA)+strlen(bufAn);
+        Bc=strlen(bufB)+strlen(bufBn);
+
+        if(Ac+Bc > col){
+          if(Ac<=col/2){
+            Bp = dottrim(bufB, col-Ac-strlen(bufBn));
+          }else if(Bc<=col/2){
+            Ap = dottrim(bufA, col-Bc-strlen(bufAn));
+          }else{
+            Ap = dottrim(bufA, col/2-strlen(bufAn));
+            Bp = dottrim(bufB, col-col/2-strlen(bufBn));
+          }
+        }
+
+        min_putchar(' ');
+        min_putstr(Ap);
+        min_fg(COLOR_MAGENTA);
+        min_putstr(bufAn);
+        min_unset();
+        min_putchar(' ');
+        min_putstr(Bp);
+        min_fg(COLOR_CYAN);
+        min_putstr(bufBn);
+        min_unset();
+        min_putstr(" p': ");
+        if(p<.01)
+          min_fg(COLOR_GREEN);
+        min_putstr(buf+5);
+     }else{
+        /* A/B/X, X/X/Y */
+        double p=compute_psingle(count,n);
+        sprintf(buf," Score: %d/%d  p': ",count,n);
+        min_putstr(buf);
+        if(n){
+          sprintf(buf,"%.2g   ",(float)p);
+          if(p<.01)
+            min_fg(COLOR_GREEN);
+        }else{
+          min_fg(COLOR_CYAN);
+          sprintf(buf,"---    ");
+        }
+        min_putstr(buf);
+      }
+    }
+    min_unset();
   }
 }
 

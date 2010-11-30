@@ -107,7 +107,7 @@ void usage(FILE *out){
           "  -M --mark-flip         : Mark transitions between samples with\n"
           "                           a short period of silence\n"
           "  -n --trials <n>        : Set desired number of trials\n"
-          "                           (default: 10)\n"
+          "                           (default: 20)\n"
           "  -r --restart-after     : Restart playback from sample start\n"
           "                           after every trial.\n"
           "  -R --restart-every     : Restart playback from sample start\n"
@@ -222,6 +222,28 @@ double factorial(int x){
   return f;
 }
 
+double compute_psingle(int correct, int tests){
+  int i;
+  // 0.5^20*(20!/(17!*3!))
+  double p=0;
+  for(i=correct;i<=tests;i++)
+    p += pow(.5,tests) * (factorial(tests) / (factorial(tests-i)*factorial(i)));
+  return p;
+}
+
+double compute_pdual(int score, int tests){
+  int i;
+  double p=0;
+  if(tests-score>score)
+    score=tests-score;
+  for(i=score;i<=tests;i++){
+    double lp = pow(.5,tests) * (factorial(tests) / (factorial(tests-i)*factorial(i)));
+    if(tests-i != i) lp*=2;
+    p+=lp;
+  }
+  return p;
+}
+
 typedef struct {
   pthread_mutex_t mutex;
   pthread_cond_t main_cond;
@@ -323,7 +345,7 @@ int main(int argc, char **argv){
   int force_truncate=0;
   int restart_mode=0;
   int beep_mode=3;
-  int tests=10;
+  int tests=20;
   double start=0;
   double end=-1;
   int outbits=0;
@@ -587,7 +609,7 @@ int main(int argc, char **argv){
     /* set up terminal */
     atexit(min_panel_remove);
     panel_init(pcm, test_files, test_mode, start, end>0 ? end : len, len,
-               beep_mode, restart_mode, tests, "");
+               beep_mode, restart_mode, tests, running_score);
 
     /* set up shared state */
     memset(&state,0,sizeof(state));
@@ -653,6 +675,7 @@ int main(int argc, char **argv){
           /* range checking enforced later */
           break;
         case 10: /* enter */
+        case 13: /* return */
           /* guarded below */
           flip_to = current_choice;
           do_select=1;
@@ -751,11 +774,11 @@ int main(int argc, char **argv){
           panel_toggle_keymap();
           break;
         case 331:
-          if(tests_cursor<tests_total)
+          if(tests_cursor<tests_total && !running_score)
             tests_cursor++;
           break;
         case 330:
-          if(tests_cursor>0)
+          if(tests_cursor>0 && !running_score)
             tests_cursor--;
             break;
         }
@@ -811,7 +834,7 @@ int main(int argc, char **argv){
         panel_update_playing(current_choice);
         panel_update_repeat_mode(restart_mode);
         panel_update_flip_mode(beep_mode);
-        panel_update_trials(choice_list,tests_cursor);
+        panel_update_trials(choice_list,sample_list,tests_cursor);
         min_flush();
         pthread_mutex_lock(&state.mutex);
       }
@@ -962,17 +985,24 @@ int main(int argc, char **argv){
   pthread_cancel(fd_handle);
   pthread_mutex_unlock(&state.mutex);
 
+  fprintf(stdout,"\n");
+
   if(test_mode!=3 && tests_cursor>0){
     int total1=0;
+
+    if(running_score)
+      fprintf(stdout,"Running totals (-g) displayed during test.\n");
+    if(tests_cursor<tests)
+      fprintf(stdout,"Test was aborted early.\n");
+
     tests=tests_cursor;
     for(i=0;i<tests;i++)
       total1+=sample_list[i];
-
     switch(test_mode){
     case 0:
       fprintf(stdout, "\nA/B test results:\n");
-      fprintf(stdout, "\tSample 1 (%s) chosen %d/%d trials.\n",pcm[0]->path,tests-total1,tests);
-      fprintf(stdout, "\tSample 2 (%s) chosen %d/%d trials.\n",pcm[1]->path,total1,tests);
+      fprintf(stdout, "\tSample 1 (%s): %d/%d trials.\n",pcm[0]->path,tests-total1,tests);
+      fprintf(stdout, "\tSample 2 (%s): %d/%d trials.\n",pcm[1]->path,total1,tests);
       break;
     case 1:
       fprintf(stdout, "\nA/B/X test results:\n");
@@ -984,14 +1014,23 @@ int main(int argc, char **argv){
       break;
     }
 
-    if(test_mode==1 || test_mode==2){
+    if(test_mode==0){
+      double p = compute_pdual(total1,tests);
+      if(total1>0 && total1<tests)
+        fprintf(stdout, "\tProbability of equal/more significant result via random chance: %.2f%%\n",p*100);
+      else
+        fprintf(stdout, "\tProbability of equally significant result via random chance: %.2f%%\n",p*100);
+      if(p<.01)
+        fprintf(stdout,"\tStatistically significant result (>=99%% confidence)\n");
+    }else{
       // 0.5^20*(20!/(17!*3!))
-      double p=0;
-      for(i=total1;i<=tests;i++)
-        p += pow(.5,tests) * (factorial(tests) / (factorial(tests-i)*factorial(i)));
-      fprintf(stdout, "\tProbability of %d or better correct via random chance: %.2f%%\n",total1,p*100);
-      if(p<.05)
-        fprintf(stdout,"\tStatistically significant result (>=95%% confidence)\n");
+      double p = compute_psingle(total1,tests);
+      if(total1<tests)
+        fprintf(stdout, "\tProbability of %d or better correct via random chance: %.2f%%\n",total1,p*100);
+      else
+        fprintf(stdout, "\tProbability of %d correct via random chance: %.2f%%\n",total1,p*100);
+      if(p<.01)
+        fprintf(stdout,"\tStatistically significant result (>=99%% confidence)\n");
     }
     fprintf(stdout,"\n");
   }

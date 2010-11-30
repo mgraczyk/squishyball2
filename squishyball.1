@@ -84,12 +84,15 @@ as Vorbis) are simply rounded.  See the section \fBCONVERSION AND DITHER
 \fRbelow for more details.
 .IP "\fB-e --end-time \fR[[\fIhh\fB:\fR]\fImm\fB:\fR]\fIss\fR[\fB.\fIff\fR]"
 Set sample end time for playback.
+.IP "\fB-g --gabbagabbahey \fR| \fB--score-display"
+Show running score and probability figures of trials so far while
+testing. Can only be used with \fB-a\fR, \fB-b\fR, or \fB-x\fR.
 .IP "\fB-h --help"
 Print usage summary to stdout and exit.
 .IP "\fB-M --mark-flip"
 Mark transitions between samples with a short period of silence (default).
 .IP "\fB-n --trials \fIn"
-Set desired number of comparison trials (default: 10).
+Set desired number of comparison trials (default: 20).
 .IP "\fB-r --restart-after"
 Set 'restart-after mode', where sample playback restarts from start point
 after every trial.
