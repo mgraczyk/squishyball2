@@ -367,6 +367,11 @@ int main(int argc, char **argv){
   int  tests_total=0;
   int  running_score=0;
 
+  int flips[3]={0,0,0}; /* count for each flip mode */
+  int undos=0;
+  int seeks=0;
+  size_t fragments_played=0;
+
   /* parse options */
 
   while((c=getopt_long(argc,argv,short_options,long_options,&long_option_index))!=EOF){
@@ -797,9 +802,11 @@ int main(int argc, char **argv){
             tests_cursor++;
           break;
         case 330:
-          if(tests_cursor>0 && !running_score)
+          if(tests_cursor>0 && !running_score){
             tests_cursor--;
-            break;
+            undos++;
+          }
+          break;
         }
 
         if(do_flip && flip_to==current_choice) do_flip=0;
@@ -903,6 +910,7 @@ int main(int argc, char **argv){
             loop=0;
           }
         }else{
+          fragments_played++;
           fill_fragment1(fragmentA, pcm[current_sample], start_pos, &current_pos, end_pos, &loop,
                          fragsamples, fadewindow1);
           if(do_flip || do_seek || do_select){
@@ -912,6 +920,7 @@ int main(int argc, char **argv){
               fill_fragment2(fragmentB, pcm[current_sample], start_pos, &current_pos, end_pos, &loop,
                              fragsamples, fadewindow1);
               seek_to=0;
+              seeks++;
             }else{
               fill_fragment1(fragmentB, pcm[current_sample], start_pos, &save_pos, end_pos, &save_loop,
                              fragsamples, fadewindow1);
@@ -934,13 +943,16 @@ int main(int argc, char **argv){
             switch(beep_mode){
             case 1: /* mark, fadewindow 2 */
               wA=fadewindow2;
+              flips[0]++;
               break;
             case 2:
               wA=fadewindow3;
               beep=beep1;
+              flips[1]++;
               break;
             case 3:
               wA=fadewindow1;
+              flips[2]++;
               break;
             }
           }
@@ -998,55 +1010,71 @@ int main(int argc, char **argv){
   pthread_cond_signal(&state.key_cond);
   pthread_mutex_unlock(&state.mutex);
 
-  fprintf(stdout,"\n");
-
   if(test_mode!=3 && tests_cursor>0){
     int total1=0;
 
-    if(running_score)
-      fprintf(stdout,"Running totals (-g) displayed during test.\n");
-    if(tests_cursor<tests)
-      fprintf(stdout,"Test was aborted early.\n");
-
-    tests=tests_cursor;
-    for(i=0;i<tests;i++)
+    for(i=0;i<tests_cursor;i++)
       total1+=sample_list[i];
     switch(test_mode){
     case 0:
       fprintf(stdout, "\nA/B test results:\n");
-      fprintf(stdout, "\tSample 1 (%s): %d/%d trials.\n",pcm[0]->path,tests-total1,tests);
-      fprintf(stdout, "\tSample 2 (%s): %d/%d trials.\n",pcm[1]->path,total1,tests);
+      fprintf(stdout, "\tSample 1 (%s): %d/%d trials.\n",pcm[0]->path,tests_cursor-total1,tests_cursor);
+      fprintf(stdout, "\tSample 2 (%s): %d/%d trials.\n",pcm[1]->path,total1,tests_cursor);
       break;
     case 1:
       fprintf(stdout, "\nA/B/X test results:\n");
-      fprintf(stdout, "\tCorrect sample identified %d/%d trials.\n",total1,tests);
+      fprintf(stdout, "\tCorrect sample identified %d/%d trials.\n",total1,tests_cursor);
       break;
     case 2:
       fprintf(stdout, "\nX/X/Y test results:\n");
-      fprintf(stdout, "\tCorrect sample identified %d/%d trials.\n",total1,tests);
+      fprintf(stdout, "\tCorrect sample identified %d/%d trials.\n",total1,tests_cursor);
       break;
     }
 
     if(test_mode==0){
-      double p = compute_pdual(total1,tests);
-      if(total1>0 && total1<tests)
+      double p = compute_pdual(total1,tests_cursor);
+      if(total1>0 && total1<tests_cursor)
         fprintf(stdout, "\tProbability of equal/more significant result via random chance: %.2f%%\n",p*100);
       else
         fprintf(stdout, "\tProbability of equally significant result via random chance: %.2f%%\n",p*100);
       if(p<.01)
-        fprintf(stdout,"\tStatistically significant result (>=99%% confidence)\n");
+        fprintf(stdout,"\tStatistically significant result (>=99%% confidence).\n");
     }else{
       // 0.5^20*(20!/(17!*3!))
-      double p = compute_psingle(total1,tests);
-      if(total1<tests)
+      double p = compute_psingle(total1,tests_cursor);
+      if(total1<tests_cursor)
         fprintf(stdout, "\tProbability of %d or better correct via random chance: %.2f%%\n",total1,p*100);
       else
         fprintf(stdout, "\tProbability of %d correct via random chance: %.2f%%\n",total1,p*100);
       if(p<.01)
-        fprintf(stdout,"\tStatistically significant result (>=99%% confidence)\n");
+        fprintf(stdout,"\tStatistically significant result (>=99%% confidence).\n");
+    }
+
+    fprintf(stdout,"\nTesting metadata:\n");
+
+    if(tests_cursor<tests)
+      fprintf(stdout,"\tTest was aborted early (%d/%d trials).\n",tests_cursor,tests);
+    fprintf(stdout,"\tTotal time spent testing: %s\n",make_time_string(fragments_played*.1,0));
+    fprintf(stdout,"\tTotal seeks: %d\n",seeks);
+    if(flips[0])
+      fprintf(stdout,"\tMark flip used %d times.\n",flips[0]);
+    if(flips[1])
+      fprintf(stdout,"\tBeep flip used %d times.\n",flips[1]);
+    if(flips[2])
+      fprintf(stdout,"\tSilent flip used %d times.\n",flips[2]);
+
+
+    if(running_score){
+      fprintf(stdout,"\tRunning totals (-g) displayed during test.\n");
+    }else{
+      if(undos)
+        fprintf(stdout,"\tUndo was used %d time[s].\n",undos);
+      else
+        fprintf(stdout,"\tUndo was not used.\n");
     }
     fprintf(stdout,"\n");
   }
+
   if(sb_verbose)
     fprintf(stderr,"\nWaiting on keyboard thread...");
   pthread_join(fd_handle,NULL);
