@@ -96,7 +96,7 @@ static int oggflac_id(char *path,unsigned char *buf){
 
 static int vorbis_id(char *path,unsigned char *buf){
   return memcmp(buf, "OggS", 4) == 0 &&
-    memcmp (buf+28, "\x01vorbis", 7);
+    memcmp (buf+28, "\x01vorbis", 7) == 0;
 }
 
 static int sw_id(char *path,unsigned char *buf){
@@ -872,6 +872,7 @@ static pcm_t *vorbis_load(char *path, FILE *in){
   }
 
   vi=ov_info(&vf,-1);
+  pcm = calloc(1,sizeof(pcm_t));
   pcm->path=strdup(path);
   pcm->bits=-32;
   pcm->ch=vi->channels;
@@ -964,7 +965,7 @@ static pcm_t *vorbis_load(char *path, FILE *in){
       fprintf(stderr,"Unhandled case: sizeof(float)!=4\n");
       exit(10);
     }
-    fill += ret*pcm->ch*3;
+    fill += ret*pcm->ch*4;
     if (sb_verbose && (throttle&0x3f)==0)
       fprintf(stderr,"\rLoading %s: %ld to go...       ",pcm->path,(long)(pcm->size-fill));
     throttle++;
@@ -1019,6 +1020,7 @@ pcm_t *load_audio_file(char *path){
     }
     j++;
   }
+  fprintf(stderr,"%s: Unrecognized file format\n",path);
   return NULL;
 }
 
