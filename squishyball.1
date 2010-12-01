@@ -8,7 +8,7 @@ squishyball \- perform sample comparison testing on the command line
 
 .SH SYNOPSIS
 .B squishyball
-[\fIoptions\fR] fileA [fileB [[\fB-c\fR] \fIfileN...\fR]] [> results.txt]
+[\fIoptions\fR] fileA [fileB [\fIfileN...\fR]] [> results.txt]
 
 .SH DESCRIPTION
 .B squishyball
@@ -72,6 +72,10 @@ sample order bias.
 .SH OTHER OPTIONS
 .IP "\fB-B --beep-flip"
 Mark transitions between samples with a short beep.
+.IP "\fB-C --clip-check"
+Check input samples for clipping.  Floating point samples can be
+checked accurately. Integer samples are checked heuristically; two or
+more consecutive full-range samples in a channel are counted as clipped.
 .IP "\fB-d --device \fIN\fR|\fIdevice"
 If a number, output to Nth available sound device.  If a device name,
 use output device matching that device name.  The backend audio driver is

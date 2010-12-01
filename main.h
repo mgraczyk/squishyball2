@@ -43,6 +43,7 @@ extern int sb_verbose;
 
 extern pcm_t *load_audio_file(char *path);
 extern void free_pcm(pcm_t *pcm);
+void check_warn_clipping(pcm_t *pcm);
 
 extern void convert_to_16(pcm_t *pcm);
 extern void convert_to_24(pcm_t *pcm);

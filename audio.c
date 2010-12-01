@@ -47,6 +47,91 @@ static inline int host_is_big_endian() {
   return 0;
 }
 
+void check_warn_clipping(pcm_t *pcm){
+  int i,j;
+  int bps = (pcm->bits==-32 ? 4 : (pcm->bits+7)>>3);
+  int cpf = pcm->ch;
+  int bpf = cpf*bps;
+  int s = pcm->size/bpf;
+  int flag[cpf];
+  size_t count=0;
+  unsigned char *d = pcm->data;
+
+  memset(flag,0,sizeof(flag));
+
+  switch(pcm->bits){
+  case 16:
+    for(i=0;i<s;i++)
+      for(j=0;j<cpf;j++){
+        short v = d[0] | (d[1]<<8);
+        if(v==-32768 || v==32767)
+          flag[j]++;
+        else{
+          if(flag[j]>1)count+=flag[j];
+          flag[j]=0;
+        }
+        d+=2;
+      }
+    for(j=0;j<cpf;j++)
+      if(flag[j]>1)count+=flag[j];
+    break;
+  case 24:
+    for(i=0;i<s;i++)
+      for(j=0;j<cpf;j++){
+        int v = ((d[0]<<8) | (d[1]<<16) | (d[2]<<24))>>8;
+        if(v==-8388608 || v==8388607)
+          flag[j]++;
+        else{
+          if(flag[j]>1)count+=flag[j];
+          flag[j]=0;
+        }
+        d+=3;
+      }
+    for(j=0;j<cpf;j++)
+      if(flag[j]>1)count+=flag[j];
+    break;
+  case -32:
+    {
+      union {
+        float f;
+        unsigned char c[4];
+      } m;
+
+      if(host_is_big_endian()){
+        for(i=0;i<s;i++)
+          for(j=0;j<cpf;j++){
+            m.c[0]=d[3];
+            m.c[1]=d[2];
+          m.c[2]=d[1];
+          m.c[3]=d[0];
+          if(m.f<-1. || m.f>=1.)
+            count++;
+          d+=4;
+          }
+      }else{
+        for(i=0;i<s;i++)
+          for(j=0;j<cpf;j++){
+            m.c[0]=d[0];
+            m.c[1]=d[1];
+            m.c[2]=d[2];
+            m.c[3]=d[3];
+          if(m.f<-1. || m.f>=1.)
+            count++;
+          d+=4;
+          }
+      }
+    }
+    break;
+  }
+
+  if(count){
+    if(bps==4)
+      fprintf(stderr,"CLIPPING WARNING: %ld clipped samples in %s.\n",(long)count,pcm->path);
+    else
+      fprintf(stderr,"CLIPPING WARNING: %ld probably clipped samples in %s.\n",(long)count,pcm->path);
+  }
+}
+
 static inline float triangle_ditherval(float *save){
   float r = rand()/(float)RAND_MAX-.5f;
   float ret = *save-r;
