@@ -441,7 +441,7 @@ int main(int argc, char **argv){
       sb_verbose=1;
       break;
     case 'V':
-      fprintf(stdout,"%s\n",VERSION);
+      fprintf(stdout,"Xiph.Org Squishyball %s\n",VERSION);
       exit(0);
     case 'g':
       running_score=1;

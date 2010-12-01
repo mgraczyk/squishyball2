@@ -1,7 +1,7 @@
 .\" Process this file with
 .\" groff -man -Tascii squishyball.1
 .\"
-.TH squishyball 1 "2010 November 29" "Xiph.Org Foundation" "Xiph Evaluation Tools"
+.TH squishyball 1 "2010 December 1" "Xiph.Org Foundation" "Xiph Evaluation Tools"
 
 .SH NAME
 squishyball \- perform sample comparison testing on the command line
@@ -200,11 +200,12 @@ sample quality.
 
 .IP "\fBFlip-Mode Choice"
 
-\fBSilent Mode\fR smoothly transitions between samples.  It allows
-the most direct comparison between signals without any intevening
-auditory distraction. However, the temporary combination of different
-signals may cause unintended cancellation and comb-filtering effects that can
-give away the 'unknown' sample just as a 'pop' would.
+\fBSilent Mode\fR smoothly transitions between samples.  It allows the
+most direct comparison between signals without any intervening auditory
+distraction. However, the temporary combination of different signals
+may cause unintended cancellation and comb-filtering effects that can
+give away the 'unknown' sample just as a 'pop' from an instantaneous
+transition would.
 
 \fBMark Mode\fR quickly fades to silence before flipping to another
 sample, marking the transition.  Because the samples never overlap,
@@ -212,11 +213,10 @@ crosslap artifacts cannot contaminate trial results.  However, the
 audible dip between samples may distract from listening, potentially
 making it slightly more difficult to detect legitimate artifacts.
 
-\fBBeep Mode\fR smoothly crosslaps samples, momentarily attenuates
-the transition, and adds a soft 'beep' to mark where the transition
-occurs.  It makes the transition point especially obvious, but may
-occasionally suffer from both crosslap artifacts (as in Silent mode)
-and momentary distraction (as in Mark mode).
+\fBBeep Mode\fR is similar to mark mode but adds a soft 'beep' to mark
+where the transition occurs.  It makes the transition point especially
+obvious.  It does not crosslap the samples; one sample is faded
+completely before the second is mixed in as in mark mode.
 
 .SH AUTHORS
 Monty <monty@xiph.org>

@@ -368,17 +368,13 @@ int setup_windows(pcm_t **pcm, int test_files,
   for(;i<fragsamples;i++)
     fadewindow2[i] = 0.f;
 
-  /* fadewindow3 crossfades with attenuation to give headroom for a beep */
-  for(i=0;i<fragsamples/4;i++){
-    float val = cosf(M_PI*2.f*(i+.5f)/fragsamples);
-    fadewindow3[i] = val*val*.875f+.125f;
+  /* fadewindow3 is like fadewindow 2 but with briefer silence */
+  for(i=0;i<fragsamples/2;i++){
+    float val = cosf(M_PI*(i+.5f)/fragsamples);
+    fadewindow3[i] = val*val;
   }
-  for(;i<fragsamples*3/4;i++)
-    fadewindow3[i] = .125f;
-  for(;i<fragsamples;i++){
-    float val = cosf(M_PI*2.f*(i-fragsamples*3/4+.5f)/fragsamples);
-    fadewindow3[i] = val*val*.125f;
-  }
+  for(;i<fragsamples;i++)
+    fadewindow3[i] = 0.f;
 
   /* Single beep for flipping */
   for(i=0;i<fragsamples/4;i++){
