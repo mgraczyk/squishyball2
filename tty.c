@@ -265,7 +265,7 @@ static int draw_samples_box(int row){
   buf[columns-1]=ACS_LRCORNER;
   min_putstr(buf);
   min_unset();
-  return p_tn+2;
+  return pcm_n+2;
 }
 
 void panel_redraw_full(void){
