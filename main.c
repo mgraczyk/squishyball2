@@ -48,14 +48,13 @@
 #define MAXFILES 10
 int sb_verbose=0;
 
-char *short_options="abcd:De:hn:rRs:tvVxBMSgC";
+char *short_options="abcd:De:hn:rRs:tvVxBMSg";
 
 struct option long_options[] = {
   {"ab",no_argument,0,'a'},
   {"abx",no_argument,0,'b'},
   {"beep-flip",no_argument,0,'B'},
   {"casual",no_argument,0,'c'},
-  {"clip-check",no_argument,0,'C'},
   {"device",required_argument,0,'d'},
   {"force-dither",no_argument,0,'D'},
   {"end-time",no_argument,0,'e'},
@@ -89,7 +88,6 @@ void usage(FILE *out){
           "  -c --casual            : casual mode; load up to ten\n"
           "                           samples for non-randomized\n"
           "                           comparison without trials (default).\n"
-          "  -C --clip-check        : Check loaded samples for clipping.\n"
           "  -d --device <N|dev>    : If a number, output to Nth\n"
           "                           sound device.  If a device name,\n"
           "                           use output driver/device matching\n"
@@ -350,7 +348,6 @@ int main(int argc, char **argv){
   int test_mode=3;
   int test_files;
   char *device=NULL;
-  int clip_check=0;
   int force_dither=0;
   int force_truncate=0;
   int restart_mode=0;
@@ -449,9 +446,6 @@ int main(int argc, char **argv){
     case 'g':
       running_score=1;
       break;
-    case 'C':
-      clip_check=1;
-      break;
     default:
       usage(stderr);
       exit(1);
@@ -487,9 +481,8 @@ int main(int argc, char **argv){
   outbits=16;
   for(i=0;i<test_files;i++){
     pcm[i]=load_audio_file(argv[optind+i]);
-    if(clip_check)
-      check_warn_clipping(pcm[i]);
     if(!pcm[i])exit(2);
+    check_warn_clipping(pcm[i]);
 
     if(!pcm[i]->dither && force_dither)pcm[i]->dither=1;
     if(pcm[i]->bits!=16 && force_truncate)pcm[i]->dither=0;
