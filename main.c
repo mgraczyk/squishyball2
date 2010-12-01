@@ -41,6 +41,7 @@
 #include <time.h>
 #include <signal.h>
 #include <ncurses.h>
+#include <poll.h>
 #include "mincurses.h"
 #include "main.h"
 
@@ -255,6 +256,7 @@ typedef struct {
   unsigned char *fragment;
   int fragment_size;
   int key_waiting;
+  int exit_fd;
 } threadstate_t;
 
 /* playback is a degenerate thread that simply allows audio output
@@ -265,10 +267,7 @@ void *playback_thread(void *arg){
 
   pthread_mutex_lock(&s->mutex);
   while(1){
-    if(s->exiting){
-      pthread_mutex_unlock(&s->mutex);
-      break;
-    }
+    if(s->exiting)break;
     if(s->fragment_size){
       int ret;
       unsigned char *data=s->fragment;
@@ -280,14 +279,12 @@ void *playback_thread(void *arg){
       s->fragment_size=0;
       s->fragment=0;
       pthread_cond_signal(&s->main_cond);
-      if(s->exiting){
-        pthread_mutex_unlock(&s->mutex);
-        break;
-      }
+      if(s->exiting)break;
     }
 
     pthread_cond_wait(&s->play_cond,&s->mutex);
   }
+  pthread_mutex_unlock(&s->mutex);
   ao_close(adev);
   ao_shutdown();
   return NULL;
@@ -300,26 +297,35 @@ void *key_thread(void *arg){
 
   pthread_mutex_lock(&s->mutex);
   while(1){
-    int ret;
-    if(s->exiting){
-      pthread_mutex_unlock(&s->mutex);
-      break;
-    }
+    int ret=ERR;
+    if(s->exiting) break;
     if(s->key_waiting==0){
       pthread_mutex_unlock(&s->mutex);
-      ret=min_getch(0);
+
+      {
+        struct pollfd fds[2]={
+          {STDIN_FILENO,POLLIN,0},
+          {s->exit_fd,POLLIN,0}
+        };
+
+        ret=poll(fds, 2, -1);
+        if(fds[1].revents&(POLLIN))
+          break;
+        if(fds[0].revents&(POLLIN))
+          ret=min_getch(1);
+      }
       pthread_mutex_lock(&s->mutex);
     }
-    if(s->exiting){
-      pthread_mutex_unlock(&s->mutex);
-      break;
-    }
+
+    if(s->exiting)break;
+
     if(ret!=ERR){
       s->key_waiting=ret;
       pthread_cond_signal(&s->main_cond);
       pthread_cond_wait(&s->key_cond,&s->mutex);
     }
   }
+  pthread_mutex_unlock(&s->mutex);
   return NULL;
 }
 
@@ -336,6 +342,7 @@ int main(int argc, char **argv){
   pthread_t playback_handle;
   pthread_t fd_handle;
   threadstate_t state;
+  int exit_fds[2];
   int c,long_option_index;
   pcm_t *pcm[MAXFILES];
   int test_mode=3;
@@ -464,6 +471,11 @@ int main(int argc, char **argv){
       usage(stderr);
       exit(1);
     }
+  }
+
+  if(pipe(exit_fds)){
+    fprintf(stderr,"Failed to create interthread pipe.\n");
+    exit(11);
   }
 
   outbits=16;
@@ -619,19 +631,7 @@ int main(int argc, char **argv){
     pthread_cond_init(&state.play_cond,NULL);
     pthread_cond_init(&state.key_cond,NULL);
     state.adev=adev;
-
-    /* fire off helper threads */
-    if(pthread_create(&playback_handle,NULL,playback_thread,&state)){
-      fprintf(stderr,"Failed to create playback thread.\n");
-      exit(7);
-    }
-    if(pthread_create(&fd_handle,NULL,key_thread,&state)){
-      fprintf(stderr,"Failed to create playback thread.\n");
-      exit(7);
-    }
-
-    /* prpare playback loop */
-    pthread_mutex_lock(&state.mutex);
+    state.exit_fd=exit_fds[0];
 
     fragmentA=calloc(fragsize,1);
     fragmentB=calloc(fragsize,1);
@@ -644,6 +644,19 @@ int main(int argc, char **argv){
     if(end_pos<fragsize)end_pos=fragsize;
     if(end_pos>size)end_pos=size;
     current_pos=start_pos;
+
+    /* fire off helper threads */
+    if(pthread_create(&playback_handle,NULL,playback_thread,&state)){
+      fprintf(stderr,"Failed to create playback thread.\n");
+      exit(7);
+    }
+    if(pthread_create(&fd_handle,NULL,key_thread,&state)){
+      fprintf(stderr,"Failed to create playback thread.\n");
+      exit(7);
+    }
+
+    /* prepare playback loop */
+    pthread_mutex_lock(&state.mutex);
 
     while(1){
 
@@ -871,7 +884,6 @@ int main(int argc, char **argv){
             seek_to += start_pos-current_pos;
             do_seek=1;
           }
-          //current_choice=0;
 
           if(tests_cursor==tests){
             pthread_mutex_lock(&state.mutex);
@@ -981,8 +993,9 @@ int main(int argc, char **argv){
   min_panel_remove();
 
   /* join */
+  write(exit_fds[1]," ",1);
   pthread_cond_signal(&state.play_cond);
-  pthread_cancel(fd_handle);
+  pthread_cond_signal(&state.key_cond);
   pthread_mutex_unlock(&state.mutex);
 
   fprintf(stdout,"\n");
@@ -1034,9 +1047,14 @@ int main(int argc, char **argv){
     }
     fprintf(stdout,"\n");
   }
-
-  pthread_join(playback_handle,NULL);
+  if(sb_verbose)
+    fprintf(stderr,"\nWaiting on keyboard thread...");
   pthread_join(fd_handle,NULL);
+  if(sb_verbose)
+    fprintf(stderr," joined.\nWaiting on playback thread...");
+  pthread_join(playback_handle,NULL);
+  if(sb_verbose)
+    fprintf(stderr," joined.\n");
   free(fadewindow1);
   free(fadewindow2);
   free(fadewindow3);
@@ -1046,6 +1064,8 @@ int main(int argc, char **argv){
   free(fragmentB);
   for(i=0;i<test_files;i++)
     free_pcm(pcm[i]);
+  if(sb_verbose)
+    fprintf(stderr,"Done.\n");
   return 0;
 }
 
