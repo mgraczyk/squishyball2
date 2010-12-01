@@ -600,7 +600,8 @@ int main(int argc, char **argv){
     off_t end_pos=(end>0?rint(end*rate*bpf):size);
     off_t current_pos;
     int paused=0;
-    double len=pcm[0]->size/((pcm[0]->bits+7)/8)/pcm[0]->ch/(double)pcm[0]->rate;
+    double base = 1.f/(rate*bpf);
+    double len = pcm[0]->size*base;
     fragsize=fragsamples*bpf;
 
     /* guard start/end params */
@@ -837,10 +838,8 @@ int main(int argc, char **argv){
 
       /* update terminal */
       {
-        double base = 1.f/(rate*bpf);
         double current = current_pos*base;
         double start = start_pos*base;
-        double len = pcm[0]->size*base;
         double end = end_pos>0?end_pos*base:len;
 
         pthread_mutex_unlock(&state.mutex);

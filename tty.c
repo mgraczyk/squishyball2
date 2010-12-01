@@ -43,7 +43,7 @@ static pcm_t **pcm_p;
 
 static char timebuffer[80];
 char *make_time_string(double is,int pad){
-  double s=is+1e-6f;
+  double s = rint(is*100)/100.;
   long hrs=s/60/60;
   long min=s/60-hrs*60;
   long sec=s-hrs*60*60-min*60;
@@ -302,7 +302,7 @@ void panel_init(pcm_t **pcm, int test_files, int test_mode, double start, double
   }
 
   if(columns<70){
-    fprintf(stderr,"Squishball requires a >=70 column terminal to run.\n");
+    fprintf(stderr,"Squisyhball requires a >=70 column terminal to run.\n");
     exit(102);
   }
 

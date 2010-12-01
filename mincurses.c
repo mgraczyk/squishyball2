@@ -489,9 +489,16 @@ static int rev=0;
 static int ul=0;
 
 static int unset(){
+  int ret=0;
+  /* some terminals do not consider acs mode an attribute to be cleared, some do */
+  if(exit_alt_charset_mode){
+     min_putp(exit_alt_charset_mode);
+  }else
+    ret|=1;
   if(exit_attribute_mode){
     min_putp(exit_attribute_mode);
-    return 0;
+    min_putp(exit_alt_charset_mode);
+    return ret;
   }else
     return 1;
 }
