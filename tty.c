@@ -43,7 +43,7 @@ static pcm_t **pcm_p;
 
 static char timebuffer[80];
 char *make_time_string(double is,int pad){
-  double s = rint(is*100)/100.;
+  double s = rint(is*100)/100.+1.e-6;
   long hrs=s/60/60;
   long min=s/60-hrs*60;
   long sec=s-hrs*60*60-min*60;
