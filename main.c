@@ -446,8 +446,9 @@ int main(int argc, char **argv){
   }
 
   if(running_score && test_mode==3){
-    fprintf(stderr,"-g is meaningless in casual comparison mode.\n");
-    exit(1);
+    if(sb_verbose)
+      fprintf(stderr,"-g is meaningless in casual comparison mode.\n");
+    running_score=0;
   }
 
   /* Verify stdin is a tty! */
