@@ -248,10 +248,10 @@ static int draw_samples_box(int row){
     }else
       min_putchar(' ');
 
-    if(strlen(pcm_p[i]->path)>columns-4)
-      print_into(buf,0,pcm_p[i]->path+strlen(pcm_p[i]->path)-columns+4);
+    if(strlen(pcm_p[i]->name)>columns-4)
+      print_into(buf,0,pcm_p[i]->name+strlen(pcm_p[i]->name)-columns+4);
     else
-      print_into(buf,0,pcm_p[i]->path);
+      print_into(buf,0,pcm_p[i]->name);
     min_putstr(buf);
     if(i==p_pl)
       min_bold(0);
@@ -549,8 +549,8 @@ void panel_update_trials(char *choices, char *correct, int n){
         char bufBn[10];
         char *Ap=bufA,*Bp=bufB;
         double p=compute_pdual(count,n);
-        snprintf(bufA,PATH_MAX,"%s: ",pcm_p[0]->path);
-        snprintf(bufB,PATH_MAX,"%s: ",pcm_p[1]->path);
+        snprintf(bufA,PATH_MAX,"%s: ",pcm_p[0]->name);
+        snprintf(bufB,PATH_MAX,"%s: ",pcm_p[1]->name);
         snprintf(bufAn,10,"%d ",n-count);
         snprintf(bufBn,10,"%d ",count);
         if(n>1)
@@ -611,18 +611,18 @@ void panel_update_playing(int n){
     if(p_tm==3){
       min_mvcur(1,boxrow+1+p_pl);
       min_putchar(' ');
-      if(strlen(pcm_p[p_pl]->path)>columns-4)
-        min_putstr(pcm_p[p_pl]->path+strlen(pcm_p[p_pl]->path)-columns+4);
+      if(strlen(pcm_p[p_pl]->name)>columns-4)
+        min_putstr(pcm_p[p_pl]->name+strlen(pcm_p[p_pl]->name)-columns+4);
       else
-        min_putstr(pcm_p[p_pl]->path);
+        min_putstr(pcm_p[p_pl]->name);
 
       min_mvcur(1,boxrow+1+n);
       min_putchar('>');
       min_bold(1);
-      if(strlen(pcm_p[n]->path)>columns-4)
-        min_putstr(pcm_p[n]->path+strlen(pcm_p[n]->path)-columns+4);
+      if(strlen(pcm_p[n]->name)>columns-4)
+        min_putstr(pcm_p[n]->name+strlen(pcm_p[n]->name)-columns+4);
       else
-        min_putstr(pcm_p[n]->path);
+        min_putstr(pcm_p[n]->name);
       min_unset();
     }
 

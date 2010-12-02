@@ -45,6 +45,22 @@ static inline int host_is_big_endian() {
   return 0;
 }
 
+static char *trim_path(char *in){
+  /* search back to first /, \, or : */
+  if(in){
+    char *a = strrchr(in,'/');
+    char *b = strrchr(in,'\\');
+    char *c = strrchr(in,':');
+    int posa = (a ? a-in+1 : 0);
+    int posb = (b ? b-in+1 : 0);
+    int posc = (c ? c-in+1 : 0);
+    if(posb>posa)posa=posb;
+    if(posc>posa)posa=posc;
+    return in+posa;
+  }
+  return NULL;
+}
+
 typedef struct{
   int (*id_func)(char *path,unsigned char *buf);
   pcm_t *(*load_func)(char *path, FILE *in);
@@ -140,7 +156,7 @@ static pcm_t *wav_load(char *path, FILE *in){
   }
 
   pcm = calloc(1,sizeof(pcm_t));
-  pcm->path=strdup(path);
+  pcm->name=strdup(trim_path(path));
 
   if(!find_wav_chunk(in, path, "fmt ", &len)){
     fprintf(stderr,"%s: Failed to find fmt chunk in WAV file\n",path);
@@ -428,7 +444,7 @@ static pcm_t *aiff_load(char *path, FILE *in){
   }
 
   pcm = calloc(1,sizeof(pcm_t));
-  pcm->path=strdup(path);
+  pcm->name=strdup(trim_path(path));
 
   if(buf2[11]=='C')
     aifc=1;
@@ -592,7 +608,7 @@ static pcm_t *aiff_load(char *path, FILE *in){
 static pcm_t *sw_load(char *path, FILE *in){
 
   pcm_t *pcm = calloc(1,sizeof(pcm_t));
-  pcm->path=strdup(path);
+  pcm->name=strdup(trim_path(path));
   pcm->bits=16;
   pcm->ch=1;
   pcm->rate=48000;
@@ -665,7 +681,7 @@ static FLAC__StreamDecoderReadStatus read_callback(const FLAC__StreamDecoder *de
   }
 
   if(sb_verbose)
-    fprintf(stderr,"\rLoading %s: %ld to go...       ",flac->pcm->path,(long)(pcm->size-flac->fill));
+    fprintf(stderr,"\rLoading %s: %ld to go...       ",flac->pcm->name,(long)(pcm->size-flac->fill));
   *bytes = fread(buffer, sizeof(FLAC__byte), *bytes, flac->in);
 
   return FLAC__STREAM_DECODER_READ_STATUS_CONTINUE;
@@ -692,11 +708,11 @@ static FLAC__StreamDecoderWriteStatus write_callback(const FLAC__StreamDecoder *
   }
 
   if(channels != pcm->ch){
-    fprintf(stderr,"\r%s: number of channels changes part way through file\n",pcm->path);
+    fprintf(stderr,"\r%s: number of channels changes part way through file\n",pcm->name);
     return FLAC__STREAM_DECODER_WRITE_STATUS_ABORT;
   }
   if(pcm->bits != (bits_per_sample+7)/8*8){
-    fprintf(stderr,"\r%s: bit depth changes part way through file\n",pcm->path);
+    fprintf(stderr,"\r%s: bit depth changes part way through file\n",pcm->name);
     return FLAC__STREAM_DECODER_WRITE_STATUS_ABORT;
   }
 
@@ -725,7 +741,7 @@ static FLAC__StreamDecoderWriteStatus write_callback(const FLAC__StreamDecoder *
         }
       break;
     default:
-      fprintf(stderr,"\r%s: Only 16- and 24-bit FLACs are supported for decode right now.\n",pcm->path);
+      fprintf(stderr,"\r%s: Only 16- and 24-bit FLACs are supported for decode right now.\n",pcm->name);
       return FLAC__STREAM_DECODER_WRITE_STATUS_ABORT;
     }
   }
@@ -756,7 +772,7 @@ static void error_callback(const FLAC__StreamDecoder *decoder,
 
   flac_callback_arg *flac = (flac_callback_arg *)client_data;
   pcm_t *pcm = flac->pcm;
-  fprintf(stderr,"\r%s: Error decoding file.\n",pcm->path);
+  fprintf(stderr,"\r%s: Error decoding file.\n",pcm->name);
 }
 
 static FLAC__bool eof_callback(const FLAC__StreamDecoder *decoder,
@@ -772,7 +788,7 @@ static pcm_t *flac_load_i(char *path, FILE *in, int oggp){
   FLAC__bool ret;
   FLAC__stream_decoder_set_md5_checking(decoder, true);
   FLAC__stream_decoder_set_metadata_respond(decoder, FLAC__METADATA_TYPE_STREAMINFO);
-  pcm->path=strdup(path);
+  pcm->name=strdup(trim_path(path));
   flac->in=in;
   flac->pcm=pcm;
 
@@ -873,7 +889,7 @@ static pcm_t *vorbis_load(char *path, FILE *in){
 
   vi=ov_info(&vf,-1);
   pcm = calloc(1,sizeof(pcm_t));
-  pcm->path=strdup(path);
+  pcm->name=strdup(trim_path(path));
   pcm->bits=-32;
   pcm->ch=vi->channels;
   pcm->rate=vi->rate;
@@ -967,7 +983,7 @@ static pcm_t *vorbis_load(char *path, FILE *in){
     }
     fill += ret*pcm->ch*4;
     if (sb_verbose && (throttle&0x3f)==0)
-      fprintf(stderr,"\rLoading %s: %ld to go...       ",pcm->path,(long)(pcm->size-fill));
+      fprintf(stderr,"\rLoading %s: %ld to go...       ",pcm->name,(long)(pcm->size-fill));
     throttle++;
   }
   ov_clear(&vf);
@@ -1026,7 +1042,7 @@ pcm_t *load_audio_file(char *path){
 
 void free_pcm(pcm_t *pcm){
   if(pcm){
-    if(pcm->path)free(pcm->path);
+    if(pcm->name)free(pcm->name);
     if(pcm->matrix)free(pcm->matrix);
     if(pcm->data)free(pcm->data);
     memset(pcm,0,sizeof(pcm));

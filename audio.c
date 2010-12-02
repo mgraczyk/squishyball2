@@ -126,9 +126,9 @@ void check_warn_clipping(pcm_t *pcm){
 
   if(count){
     if(bps==4)
-      fprintf(stderr,"CLIPPING WARNING: %ld clipped samples in %s.\n",(long)count,pcm->path);
+      fprintf(stderr,"CLIPPING WARNING: %ld clipped samples in %s.\n",(long)count,pcm->name);
     else
-      fprintf(stderr,"CLIPPING WARNING: %ld probably clipped samples in %s.\n",(long)count,pcm->path);
+      fprintf(stderr,"CLIPPING WARNING: %ld probably clipped samples in %s.\n",(long)count,pcm->name);
   }
 }
 
@@ -143,7 +143,7 @@ static void float32_to_24(pcm_t *pcm){
   unsigned char *d = pcm->data;
   off_t j;
   if(sb_verbose)
-    fprintf(stderr,"\rConverting %s to 24 bit... ",pcm->path);
+    fprintf(stderr,"\rConverting %s to 24 bit... ",pcm->name);
   for(j=0;j<pcm->size/4;j++){
     int val=0;
     int mantissa = d[j*4] | (d[j*4+1]<<8) | ((d[j*4+2]&0x7f)<<16) | (1<<23);
@@ -151,7 +151,7 @@ static void float32_to_24(pcm_t *pcm){
     int sign = d[j*4+3]>>7;
     if(exponent <= 0){
       if(exponent == -128){
-        fprintf(stderr,"%s: Input file contains invalid floating point values.\n",pcm->path);
+        fprintf(stderr,"%s: Input file contains invalid floating point values.\n",pcm->name);
         exit(6);
       }
       if(sign)
@@ -186,7 +186,7 @@ static void float32_to_16(pcm_t *pcm){
 
   if(sb_verbose)
     fprintf(stderr,"\r%s %s to 16 bit... ",
-            pcm->dither?"Dithering":"Down-converting",pcm->path);
+            pcm->dither?"Dithering":"Down-converting",pcm->name);
 
   /* again assumes IEEE754, which is not pedantically correct */
   if(sizeof(float)==4){
@@ -247,7 +247,7 @@ static void demote_24_to_16(pcm_t *pcm){
 
   if(sb_verbose)
     fprintf(stderr,"\r%s %s to 16 bit... ",
-            pcm->dither?"Dithering":"Down-converting",pcm->path);
+            pcm->dither?"Dithering":"Down-converting",pcm->name);
 
   memset(t,0,sizeof(t));
 
@@ -284,7 +284,7 @@ static void promote_to_24(pcm_t *pcm){
   off_t i;
 
   if(sb_verbose)
-    fprintf(stderr,"\rPromoting %s to 24 bit... ",pcm->path);
+    fprintf(stderr,"\rPromoting %s to 24 bit... ",pcm->name);
 
   {
     unsigned char *ret=realloc(pcm->data,pcm->size*3/2);
@@ -318,7 +318,7 @@ void convert_to_16(pcm_t *pcm){
     float32_to_16(pcm);
     break;
   default:
-    fprintf(stderr,"%s: Unsupported sample format.\n",pcm->path);
+    fprintf(stderr,"%s: Unsupported sample format.\n",pcm->name);
     exit(6);
   }
 }
@@ -334,7 +334,7 @@ void convert_to_24(pcm_t *pcm){
     float32_to_24(pcm);
     break;
   default:
-    fprintf(stderr,"%s: Unsupported sample format.\n",pcm->path);
+    fprintf(stderr,"%s: Unsupported sample format.\n",pcm->name);
     exit(6);
   }
 }

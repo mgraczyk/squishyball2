@@ -29,7 +29,7 @@
 typedef struct pcm_struct pcm_t;
 
 struct pcm_struct {
-  char *path;
+  char *name;
   int rate;
   int bits; /* negative indicates IEEE754 float */
   int ch;

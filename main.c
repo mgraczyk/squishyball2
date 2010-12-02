@@ -497,7 +497,7 @@ int main(int argc, char **argv){
       fprintf(stderr,"Input sample rates do not match!\n"
               "\t%s: %dHz\n"
               "\t%s: %dHz\n"
-              "Aborting\n",pcm[0]->path,pcm[0]->rate,pcm[i]->path,pcm[i]->rate);
+              "Aborting\n",pcm[0]->name,pcm[0]->rate,pcm[i]->name,pcm[i]->rate);
       exit(3);
     }
 
@@ -506,7 +506,7 @@ int main(int argc, char **argv){
       fprintf(stderr,"Input channel counts do not match!\n"
               "\t%s: %d channels\n"
               "\t%s: %d channels\n"
-              "Aborting\n",pcm[0]->path,pcm[0]->ch,pcm[i]->path,pcm[i]->ch);
+              "Aborting\n",pcm[0]->name,pcm[0]->ch,pcm[i]->name,pcm[i]->ch);
       exit(3);
     }
 
@@ -565,7 +565,7 @@ int main(int argc, char **argv){
 
       for(i=0;i<test_files;i++){
         if(sb_verbose)
-        fprintf(stderr,"\t%s: %s\n",pcm[i]->path,
+        fprintf(stderr,"\t%s: %s\n",pcm[i]->name,
                 make_time_string((double)pcm[i]->size/pcm[i]->ch/((pcm[i]->bits+7)/8)/pcm[i]->rate,0));
         pcm[i]->size=n;
       }
@@ -1018,8 +1018,8 @@ int main(int argc, char **argv){
     switch(test_mode){
     case 0:
       fprintf(stdout, "\nA/B test results:\n");
-      fprintf(stdout, "\tSample 1 (%s): %d/%d trials.\n",pcm[0]->path,tests_cursor-total1,tests_cursor);
-      fprintf(stdout, "\tSample 2 (%s): %d/%d trials.\n",pcm[1]->path,total1,tests_cursor);
+      fprintf(stdout, "\tSample 1 (%s): %d/%d trials.\n",pcm[0]->name,tests_cursor-total1,tests_cursor);
+      fprintf(stdout, "\tSample 2 (%s): %d/%d trials.\n",pcm[1]->name,total1,tests_cursor);
       break;
     case 1:
       fprintf(stdout, "\nA/B/X test results:\n");
