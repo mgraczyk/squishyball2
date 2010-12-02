@@ -170,7 +170,7 @@ static void float32_to_24(pcm_t *pcm){
     d[j*3+2]=(val>>16)&0xff;
   }
   if(sb_verbose)
-    fprintf(stderr,"...done.\n");
+    fprintf(stderr,"done.\n");
   pcm->bits=24;
   pcm->size/=4;
   pcm->size*=3;
@@ -233,7 +233,7 @@ static void float32_to_16(pcm_t *pcm){
   }
 
   if(sb_verbose)
-    fprintf(stderr,"...done.\n");
+    fprintf(stderr,"done.\n");
 
   pcm->bits=16;
   pcm->size/=2;
@@ -273,7 +273,7 @@ static void demote_24_to_16(pcm_t *pcm){
   }
 
   if(sb_verbose)
-    fprintf(stderr,"...done.\n");
+    fprintf(stderr,"done.\n");
 
   pcm->bits=16;
   pcm->size/=3;
@@ -300,7 +300,7 @@ static void promote_to_24(pcm_t *pcm){
     }
   }
   if(sb_verbose)
-    fprintf(stderr,"...done.\n");
+    fprintf(stderr,"done.\n");
 
   pcm->bits=24;
   pcm->size/=2;
