@@ -715,7 +715,13 @@ ao_device *setup_playback(int rate, int ch, int bits, char *matrix, char *device
   if(!device){
     /* if we don't have an explicit device, defaults make this easy */
     int id = ao_default_driver_id();
-    aname=ao_driver_info(id)->short_name;
+    ao_info *ai;
+    if(id<0)
+      return NULL;
+    ai=ao_driver_info(id);
+    if(!ai)
+      return NULL;
+    aname=ai->short_name;
     ret=ao_open_live(id, &sf, &aoe);
   }else{
     /* Otherwise... there's some hunting to do. */
