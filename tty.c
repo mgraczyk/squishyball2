@@ -162,9 +162,10 @@ static int draw_timebar(int row){
 
 static int draw_playbar(int row){
   int pre = floor(p_st/p_len*columns);
-  int post = columns-floor(p_end/p_len*columns+1.e-6f);
+  int post = floor(p_end/p_len*columns+1.e-6f);
   int i;
   playrow=row;
+  if(post>columns-1)post=columns-1;
 
   i=0;
   min_mvcur(0,row);
@@ -174,7 +175,7 @@ static int draw_playbar(int row){
     i++;
   }
   min_bg(COLOR_BLACK);
-  while(i<(columns-post)){
+  while(i<=post){
     min_putchar(' ');
     i++;
   }
@@ -370,14 +371,14 @@ void panel_update_current(double time){
 
     if(was!=now || force){
       int pre = floor(p_st/p_len*columns);
-      int post = columns-floor(p_end/p_len*columns+1.e-6f);
+      int post = floor(p_end/p_len*columns+1.e-6f);
 
       min_bold(1);
       min_gfx(1);
 
       if(was>=0){
         min_mvcur(was,playrow);
-        if(was<pre || (columns-was)<post){
+        if(was<pre || was>post){
           min_color(COLOR_YELLOW,COLOR_CYAN);
         }else{
           min_color(COLOR_YELLOW,COLOR_BLACK);
@@ -387,11 +388,7 @@ void panel_update_current(double time){
       was=now;
 
       min_mvcur(now,playrow);
-      if(now<pre || (columns-now)<post){
-        min_bg(COLOR_CYAN);
-      }else{
-        min_bg(COLOR_BLACK);
-      }
+      min_bg(COLOR_BLACK);
       min_putchar(ACS_VLINE);
       min_unset();
     }
