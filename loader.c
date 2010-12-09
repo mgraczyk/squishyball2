@@ -700,7 +700,7 @@ static FLAC__StreamDecoderWriteStatus write_callback(const FLAC__StreamDecoder *
   int i, j;
 
   if(pcm->data == NULL){
-    /* lasy initialization */
+    /* lazy initialization */
     pcm->ch = channels;
     pcm->bits = (bits_per_sample+7)/8*8;
     pcm->size *= pcm->bits/8*channels;
@@ -782,12 +782,22 @@ static FLAC__bool eof_callback(const FLAC__StreamDecoder *decoder,
 }
 
 static pcm_t *flac_load_i(char *path, FILE *in, int oggp){
-  pcm_t *pcm = calloc(1,sizeof(pcm_t));
-  flac_callback_arg *flac = calloc(1,sizeof(flac_callback_arg));
-  FLAC__StreamDecoder *decoder = FLAC__stream_decoder_new();
+  pcm_t *pcm;
+  flac_callback_arg *flac;
+  FLAC__StreamDecoder *decoder;
   FLAC__bool ret;
+
+  if(fseek(in,0,SEEK_SET)==-1){
+    fprintf(stderr,"%s: Failed to seek\n",path);
+    goto err;
+  }
+
+  pcm = calloc(1,sizeof(pcm_t));
+  flac = calloc(1,sizeof(flac_callback_arg));
+  decoder = FLAC__stream_decoder_new();
   FLAC__stream_decoder_set_md5_checking(decoder, true);
   FLAC__stream_decoder_set_metadata_respond(decoder, FLAC__METADATA_TYPE_STREAMINFO);
+
   pcm->name=strdup(trim_path(path));
   flac->in=in;
   flac->pcm=pcm;
@@ -856,6 +866,8 @@ static pcm_t *flac_load_i(char *path, FILE *in, int oggp){
   if(sb_verbose)
     fprintf(stderr,"\r%s: loaded.                 \n",path);
   return pcm;
+ err:
+  return NULL;
 }
 
 static pcm_t *flac_load(char *path, FILE *in){
