@@ -735,7 +735,7 @@ static FLAC__StreamDecoderWriteStatus write_callback(const FLAC__StreamDecoder *
         for (i = 0; i < channels; i++){
           d[0] = (buffer[i][j]<<shift)&0xff;
           d[1] = (buffer[i][j]<<shift>>8)&0xff;
-          d[3] = (buffer[i][j]<<shift>>16)&0xff;
+          d[2] = (buffer[i][j]<<shift>>16)&0xff;
           d+=3;
           fill+=3;
         }
