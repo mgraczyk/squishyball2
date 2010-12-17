@@ -643,7 +643,10 @@ void panel_update_playing(int n){
         break;
       case 2: /* XXY*/
       case 3: /* Casual */
-        min_putchar(p_pl+'1');
+        if(p_pl<9)
+          min_putchar(p_pl+'1');
+        else
+          min_putchar('0');
         break;
       }
     }
@@ -667,7 +670,10 @@ void panel_update_pause(int flag){
         break;
       case 2: /* XXY*/
       case 3: /* Casual */
-        min_putchar(p_pl+'1');
+        if(p_pl<9)
+          min_putchar(p_pl+'1');
+        else
+          min_putchar('0');
         break;
       }
       min_putchar(' ');
