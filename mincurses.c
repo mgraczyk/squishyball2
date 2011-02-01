@@ -457,8 +457,8 @@ int min_hidecur(){
 }
 
 int min_showcur(){
-  if(cursor_visible){
-    min_putp(cursor_visible);
+  if(cursor_normal){
+    min_putp(cursor_normal);
     return 0;
   }else
     return 1;
