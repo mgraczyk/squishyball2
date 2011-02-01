@@ -334,11 +334,11 @@ static void setup_term_customize(void){
     term.c_lflag &= ~(ECHO | ECHONL);
     term.c_iflag &= ~(ICRNL | INLCR | IGNCR);
     term.c_oflag &= ~(ONLCR);
-    term.c_lflag |= ISIG;
+    term.c_lflag &= ~(ISIG);
     term.c_cc[VMIN] = 1;
     term.c_cc[VTIME] = 0;
 #else
-    term.sg_flags |= CBREAK;
+    term.sg_flags |= RAW;
     term.sg_flags &= ~(ECHO | CRMOD);
 #endif
     SET_TTY(outfd,&term);
@@ -457,8 +457,8 @@ int min_hidecur(){
 }
 
 int min_showcur(){
-  if(cursor_normal){
-    min_putp(cursor_normal);
+  if(cursor_visible){
+    min_putp(cursor_visible);
     return 0;
   }else
     return 1;
