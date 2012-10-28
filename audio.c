@@ -580,7 +580,7 @@ void fill_fragment1(unsigned char *out, pcm_t *pcm, off_t start, off_t *pos, off
         float w = fadewindow[--lp];
         for(j=0;j<cpf;j++){
           float val = get_val(A,bps)*(1.f-w) + get_val(B,bps)*w;
-          put_val(out,val,bps);
+          put_val(out,bps,val);
           A+=bps;
           B+=bps;
           out+=bps;
