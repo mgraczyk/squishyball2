@@ -1,7 +1,7 @@
 .\" Process this file with
 .\" groff -man -Tascii squishyball.1
 .\"
-.TH squishyball 1 "2010 December 1" "Xiph.Org Foundation" "Xiph Evaluation Tools"
+.TH squishyball 1 "2012 October 28" "Xiph.Org Foundation" "Xiph Evaluation Tools"
 
 .SH NAME
 squishyball \- perform sample comparison testing on the command line
@@ -80,8 +80,8 @@ selected automatically based on the device name provided.
 Always use dither when down-converting to 16-bit samples for playback
 on audio devices that do not support 24-bit playback. By default,
 uncompressed samples are always dithered, but lossy formats (such
-as Vorbis) are simply rounded.  See the section \fBCONVERSION AND DITHER
-\fRbelow for more details.
+as Vorbis and Opus) are simply rounded.  See the 
+section \fBCONVERSION AND DITHER \fRbelow for more details.
 .IP "\fB-e --end-time \fR[[\fIhh\fB:\fR]\fImm\fB:\fR]\fIss\fR[\fB.\fIff\fR]"
 Set sample end time for playback.
 .IP "\fB-g --gabbagabbahey \fR| \fB--score-display"
@@ -164,12 +164,14 @@ Abort testing early.
 Mono signed 16-bit little endian raw with a .sw extension
 .IP \fBOggVorbis
 all Vorbis I files
+.IP \fBOggOpus
+all Opus files
 
 .SH CONVERSION AND DITHER
 \fBsquishyball \fRloads all linear PCM file types at native bit depth.
 Uncompressed floating point files (eg, 32 bit floating point WAV) are
-converted to 24-bit integer PCM.  Ogg Vorbis files are also decoded to
-24-bit.
+converted to 24-bit integer PCM.  Opus and Ogg Vorbis files are also
+decoded to 24-bit.
 
 Files are 'reconciled' to identical channel ordering, length and
 bit-depth before playback begins so that CPU and memory resources usage
@@ -178,13 +180,14 @@ playback is available and at least one sample is 24-bit, all samples
 are promoted to 24 bits. If 24-bit playback is unavailable, 24-bit samples
 are demoted to 16 bits.
 
-Floating point samples (32-bit) are not dithered when converting to 24-bit.
-24-bit and floating point (32 bit) samples are dithered using a TPDF
-when down-conversion to 16-bit is necessary.  Lossy-encoded samples (eg
-Ogg Vorbis files) are an exception; they are not dithered by default during
-down-conversion. This behavior can be overridden by \fB-D\fR,
-which forces dithering for lossy files as well.  Down-conversion
-dithering can be disabled for all input types with \fB-t\fR.
+Floating point samples (32-bit) are not dithered when converting to
+24-bit.  24-bit and floating point (32 bit) samples are dithered using
+a TPDF when down-conversion to 16-bit is necessary.  Lossy-encoded
+samples (eg Ogg Vorbis and Opus files) are an exception; they are not
+dithered by default during down-conversion. This behavior can be
+overridden by \fB-D\fR, which forces dithering for lossy files as
+well.  Down-conversion dithering can be disabled for all input types
+with \fB-t\fR.
 
 Samples are checked for clipping at load time. Floating point samples
 can be checked accurately. Integer samples are checked heuristically;
@@ -230,4 +233,4 @@ Monty <monty@xiph.org>
 .SH "SEE ALSO"
 
 .PP
-\fBabx-comparator\fR(1), \fBrateit\fR(1), \fBogg123\fR(1), \fBoggdec\fR(1), \fBflac\fR(1)
+\fBabx-comparator\fR(1), \fBrateit\fR(1), \fBogg123\fR(1), \fBoggdec\fR(1), \fBopusdec\fR(1), \fBflac\fR(1)

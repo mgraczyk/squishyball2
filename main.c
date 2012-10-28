@@ -2,7 +2,7 @@
  *
  *  squishyball
  *
- *      Copyright (C) 2010 Xiph.Org
+ *      Copyright (C) 2010-2012 Xiph.Org
  *
  *  squishyball is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -96,9 +96,9 @@ void usage(FILE *out){
           "                           to 16-bit for playback on output\n"
           "                           devices that do not support 24-bit\n"
           "                           playback. Currently only affects\n"
-          "                           Vorbis playback; all other files\n"
-          "                           a dithered by default during down-\n"
-          "                           conversion.\n"
+          "                           Vorbis and Opus playback; all other\n"
+          "                           files are dithered by default during\n"
+          "                           down-\n conversion.\n"
           "  -e --end-time <time>   : Set sample end time for playback\n"
           "  -g --gabbagabbahey     : Display a running trials score along\n"
           "                           with indicating if each trial choice\n"
@@ -152,6 +152,7 @@ void usage(FILE *out){
           "  FLAC and OggFLAC : 16- and 24-bit\n"
           "  SW               : mono signed 16-bit little endian raw\n"
           "  OggVorbis        : all Vorbis I files\n"
+          "  OggOpus          : all Opus files\n"
           "\n"
           ,VERSION);
 }

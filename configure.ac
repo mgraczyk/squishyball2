@@ -13,6 +13,7 @@ AC_PROG_CC
 
 # Checks for libraries.
 
+PKG_CHECK_MODULES([opusfile], [opusfile])
 PKG_CHECK_MODULES([vorbisfile], [vorbisfile])
 PKG_CHECK_MODULES([FLAC], [flac >= 0.8.0])
 PKG_CHECK_MODULES([ao], [ao > 1.0.0])
@@ -25,6 +26,7 @@ AC_CHECK_LIB([pthread], [pthread_create])
 AC_HEADER_STDC
 AC_CHECK_HEADERS([stdlib.h string.h])
 AC_CHECK_HEADERS([vorbis/vorbisfile.h])
+AC_CHECK_HEADERS([opus/opusfile.h])
 AC_CHECK_HEADERS([ao/ao.h])
 AC_CHECK_HEADERS([FLAC/stream_decoder.h])
 
@@ -74,11 +76,11 @@ else
         esac
 fi
 
-COMMON_FLAGS="$cflags_save $vorbisfile_CFLAGS $ao_CFLAGS $FLAC_CFLAGS -DUSE_FKEYSF=$USE_FKEYSF"
+COMMON_FLAGS="$cflags_save $vorbisfile_CFLAGS $opusfile_CFLAGS $ao_CFLAGS $FLAC_CFLAGS -DUSE_FKEYSF=$USE_FKEYSF"
 CFLAGS="$CFLAGS -DVERSION='\"$VERSION\"' $COMMON_FLAGS"
 DEBUG="$DEBUG -DVERSION='\\\"$VERSION\\\"' $COMMON_FLAGS"
 PROFILE="$PROFILE -DVERSION='\\\"$VERSION\\\"' $COMMON_FLAGS"
-LIBS="$LIBS $vorbisfile_LIBS $ao_LIBS $FLAC_LIBS"
+LIBS="$LIBS $vorbisfile_LIBS $opusfile_LIBS $ao_LIBS $FLAC_LIBS"
 AC_SUBST(DEBUG)
 AC_SUBST(PROFILE)
 

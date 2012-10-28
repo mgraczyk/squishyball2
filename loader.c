@@ -2,7 +2,7 @@
  *
  *  squishyball
  *
- *      Copyright (C) 2010 Xiph.Org
+ *      Copyright (C) 2010-2012 Xiph.Org
  *
  *  squishyball is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -31,6 +31,7 @@
 #include <math.h>
 #include <errno.h>
 #include <vorbis/vorbisfile.h>
+#include <opus/opusfile.h>
 #include <FLAC/stream_decoder.h>
 #include <unistd.h>
 #include "main.h"
@@ -113,6 +114,11 @@ static int oggflac_id(char *path,unsigned char *buf){
 static int vorbis_id(char *path,unsigned char *buf){
   return memcmp(buf, "OggS", 4) == 0 &&
     memcmp (buf+28, "\x01vorbis", 7) == 0;
+}
+
+static int opus_id(char *path,unsigned char *buf){
+  return memcmp(buf, "OggS", 4) == 0 &&
+    memcmp (buf+28, "OpusHead", 8) == 0;
 }
 
 static int sw_id(char *path,unsigned char *buf){
@@ -1009,7 +1015,157 @@ static pcm_t *vorbis_load(char *path, FILE *in){
   return NULL;
 }
 
-#define MAX_ID_LEN 35
+/* Opus load support **************************************************************************/
+
+int opc_read(void *_stream,unsigned char *_ptr,int _nbytes){
+  return fread(_ptr,1,_nbytes,_stream);
+}
+
+int opc_seek(void *_stream,opus_int64 _offset,int _whence){
+  return fseek(_stream,_offset,_whence);
+}
+
+opus_int64 opc_tell(void *_stream){
+  return ftell(_stream);
+}
+
+int opc_close(void *_stream){
+  return 0;
+}
+
+static OpusFileCallbacks opus_callbacks =
+  { opc_read,opc_seek,opc_tell,opc_close };
+
+static pcm_t *opus_load(char *path, FILE *in){
+  OggOpusFile *of;
+  pcm_t *pcm=NULL;
+  off_t fill=0;
+  int throttle=0;
+  int last_section=-1;
+  int i,j;
+
+  if(fseek(in,0,SEEK_SET)==-1){
+    fprintf(stderr,"%s: Failed to seek\n",path);
+    goto err;
+  }
+
+  of = op_open_callbacks(in, &opus_callbacks , NULL, 0, NULL);
+  if(!of){
+    fprintf(stderr,"Input does not appear to be an Opus bitstream.\n");
+    goto err;
+  }
+
+  pcm = calloc(1,sizeof(pcm_t));
+  pcm->name=strdup(trim_path(path));
+  pcm->bits=-32;
+  pcm->ch=op_channel_count(of,-1);
+  pcm->rate=48000;
+  pcm->size=op_pcm_total(of,-1)*pcm->ch*4;
+  pcm->data=calloc(pcm->size,1);
+
+
+  switch(pcm->ch){
+  case 1:
+    pcm->matrix = strdup("M");
+    break;
+  case 2:
+    pcm->matrix = strdup("L,R");
+    break;
+  case 3:
+    pcm->matrix = strdup("L,C,R");
+    break;
+  case 4:
+    pcm->matrix = strdup("L,R,BL,BR");
+    break;
+  case 5:
+    pcm->matrix = strdup("L,C,R,BL,BR");
+    break;
+  case 6:
+    pcm->matrix = strdup("L,C,R,BL,BR,LFE");
+    break;
+  case 7:
+    pcm->matrix = strdup("L,C,R,SL,SR,BC,LFE");
+    break;
+  default:
+    pcm->matrix = strdup("L,C,R,SL,SR,BL,BR,LFE");
+    break;
+  }
+
+  while(fill<pcm->size){
+    int current_section;
+    int i,j;
+    float pcmout[4096];
+    long ret=op_read_float(of,pcmout,4096,&current_section);
+    unsigned char *d = pcm->data+fill;
+    float *s = pcmout;
+
+    if(current_section!=last_section){
+      last_section=current_section;
+      if(op_channel_count(of,-1) != pcm->ch){
+        fprintf(stderr,"%s: Chained file changes channel count\n",path);
+        goto err;
+      }
+    }
+
+    if(ret<0){
+      fprintf(stderr,"%s: Error while decoding file\n",path);
+      goto err;
+    }
+    if(ret==0){
+      fprintf(stderr,"%s: Audio data ended prematurely\n",path);
+      goto err;
+    }
+
+    if(sizeof(float)==4){
+      /* Assuming IEEE754, which is pedantically incorrect */
+      union {
+        float f;
+        unsigned char c[4];
+      } m;
+      if(host_is_big_endian()){
+        for(i=0;i<ret;i++){
+          for(j=0;j<pcm->ch;j++){
+            m.f=*s++;
+            d[0] = m.c[3];
+            d[1] = m.c[2];
+            d[2] = m.c[1];
+            d[3] = m.c[0];
+            d+=4;
+          }
+        }
+      }else{
+        for(i=0;i<ret;i++){
+          for(j=0;j<pcm->ch;j++){
+            m.f=*s++;
+            d[0] = m.c[0];
+            d[1] = m.c[1];
+            d[2] = m.c[2];
+            d[3] = m.c[3];
+            d+=4;
+          }
+        }
+      }
+    }else{
+      fprintf(stderr,"Unhandled case: sizeof(float)!=4\n");
+      exit(10);
+    }
+    fill += ret*pcm->ch*4;
+    if (sb_verbose && (throttle&0x3f)==0)
+      fprintf(stderr,"\rLoading %s: %ld to go...       ",pcm->name,(long)(pcm->size-fill));
+    throttle++;
+  }
+  op_free(of);
+
+  if(sb_verbose)
+    fprintf(stderr,"\r%s: loaded.                 \n",path);
+  return pcm;
+ err:
+  op_free(of);
+  free_pcm(pcm);
+  return NULL;
+}
+
+#define MAX_ID_LEN 36
 unsigned char buf[MAX_ID_LEN];
 
 /* Define the supported formats here */
@@ -1019,6 +1175,7 @@ static input_format formats[] = {
   {flac_id,    flac_load,   "flac"},
   {oggflac_id, oggflac_load,"oggflac"},
   {vorbis_id,  vorbis_load, "oggvorbis"},
+  {opus_id,  opus_load,     "oggopus"},
   {sw_id,      sw_load,     "sw"},
   {NULL,       NULL,        NULL}
 };
