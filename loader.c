@@ -439,6 +439,7 @@ static pcm_t *aiff_load(char *path, FILE *in){
   unsigned char *buffer;
   unsigned char buf2[12];
   int bend = 1;
+  int fp = 0;
 
   if(fseek(in,0,SEEK_SET)==-1){
     fprintf(stderr,"%s: Failed to seek\n",path);
@@ -504,6 +505,9 @@ static pcm_t *aiff_load(char *path, FILE *in){
       bend = 1;
     }else if(!memcmp(buffer+18, "sowt", 4)){
       bend = 0;
+    }else if(!memcmp(buffer+18, "fl32", 4)){
+      bend = 1;
+      fp = 1;
     }else{
       fprintf(stderr, "%s: Can't handle compressed AIFF-C (%c%c%c%c)\n", path,
               *(buffer+18), *(buffer+19), *(buffer+20), *(buffer+21));
@@ -528,12 +532,16 @@ static pcm_t *aiff_load(char *path, FILE *in){
   int offset = READ_U32_BE(buf2);
   int blocksize = READ_U32_BE(buf2+4);
 
-  if(!(pcm->bits==24 || pcm->bits == 16 || pcm->bits == 8)){
+  if(!((fp==0 && (pcm->bits==24 || pcm->bits == 16 || pcm->bits == 8)) ||
+       (fp==1 && pcm->bits==32))){
     fprintf(stderr,
             "%s: Unsupported type of AIFF/AIFC file\n"
-            " Must be 8-, 16- or 24-bit integer PCM.\n",path);
+            " Must be 8-, 16- or 24-bit integer or 32-bit floating point PCM.\n",
+            path);
     goto err;
   }
+  if(fp==1)
+    pcm->bits = -pcm->bits;
 
   fseek(in, offset, SEEK_CUR); /* Swallow some data */
 
@@ -593,6 +601,14 @@ static pcm_t *aiff_load(char *path, FILE *in){
       if(bend){
         for(j=0;j<pcm->size/3;j++)
           swap(d+j*3,d+j*3+2);
+      }
+      break;
+    case -32:
+      if(bend){
+        for(j=0;j<pcm->size/4;j++) {
+          swap(d+j*4,d+j*4+3);
+          swap(d+j*4+1,d+j*4+2);
+        }
       }
       break;
     }
