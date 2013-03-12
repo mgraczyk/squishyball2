@@ -500,7 +500,7 @@ static pcm_t *aiff_load(char *path, FILE *in){
       goto err;
     }
 
-    if(!memcmp(buffer+18, "NONE", 4)){
+    if(!memcmp(buffer+18, "NONE", 4) || !memcmp(buffer+18, "twos", 4)){
       bend = 1;
     }else if(!memcmp(buffer+18, "sowt", 4)){
       bend = 0;
@@ -528,8 +528,7 @@ static pcm_t *aiff_load(char *path, FILE *in){
   int offset = READ_U32_BE(buf2);
   int blocksize = READ_U32_BE(buf2+4);
 
-  if( blocksize != 0 ||
-      !(pcm->bits==24 || pcm->bits == 16 || pcm->bits == 8)){
+  if(!(pcm->bits==24 || pcm->bits == 16 || pcm->bits == 8)){
     fprintf(stderr,
             "%s: Unsupported type of AIFF/AIFC file\n"
             " Must be 8-, 16- or 24-bit integer PCM.\n",path);
