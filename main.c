@@ -42,6 +42,9 @@
 #include <signal.h>
 #include <ncurses.h>
 #include <poll.h>
+#ifdef __APPLE__
+#include <sys/select.h>
+#endif
 #include "mincurses.h"
 #include "main.h"
 
@@ -304,6 +307,17 @@ void *key_thread(void *arg){
       pthread_mutex_unlock(&s->mutex);
 
       {
+#ifdef __APPLE__
+        fd_set fds;
+        FD_ZERO(&fds);
+        FD_SET(STDIN_FILENO, &fds);
+        FD_SET(s->exit_fd, &fds);
+        ret=select(s->exit_fd+1,&fds,NULL,NULL,NULL);
+        if(FD_ISSET(s->exit_fd,&fds))
+          break;
+        if(FD_ISSET(STDIN_FILENO,&fds))
+          ret=min_getch(1);
+#else
         struct pollfd fds[2]={
           {STDIN_FILENO,POLLIN,0},
           {s->exit_fd,POLLIN,0}
@@ -314,6 +328,7 @@ void *key_thread(void *arg){
           break;
         if(fds[0].revents&(POLLIN))
           ret=min_getch(1);
+#endif
       }
       pthread_mutex_lock(&s->mutex);
     }

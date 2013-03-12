@@ -46,6 +46,10 @@
 #include <math.h>
 #include <errno.h>
 #include <poll.h>
+#ifdef __APPLE__
+#include <sys/select.h>
+#include <sys/time.h>
+#endif
 
 #include "mincurses.h"
 
@@ -177,11 +181,22 @@ static inline int fifo_push(int nonblock){
 
   if(nonblock){
     int ret;
+#ifdef __APPLE__
+    fd_set fds;
+    struct timeval zeroto = {0,0};
+    FD_ZERO(&fds);
+    FD_SET(STDIN_FILENO,&fds);
+    ret=select(STDIN_FILENO+1,&fds,NULL,NULL,&zeroto);
+    if(ret!=1){
+      return ERR;
+    }
+#else
     struct pollfd fds={STDIN_FILENO,POLLIN,0};
     ret=poll(&fds, 1, 0);
     if(!fds.revents&(POLLIN)){
       return ERR;
     }
+#endif
   }
   n = read(STDIN_FILENO, &c2, 1);
   ch = c2;
