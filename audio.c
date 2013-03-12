@@ -710,7 +710,7 @@ ao_device *setup_playback(int rate, int ch, int bits, char *matrix, char *device
   sf.bits=bits;
   sf.byte_format=AO_FMT_LITTLE;
   sf.matrix=(ch>2?matrix:0);
-  aoe.key="debug";
+  aoe.key="quiet";
 
   if(!device){
     /* if we don't have an explicit device, defaults make this easy */
@@ -751,15 +751,9 @@ ao_device *setup_playback(int rate, int ch, int bits, char *matrix, char *device
       /* don't try to open the driver if it doesn't have the device/id
          option; it will ignore the option and try to open its default */
       for(j=0;j<info->option_count;j++)
-        if(!strcmp(info->options[j],ao.key)){
-          fprintf(stderr,"Got option for %s\n",aname);
-          break;
-        }
-      if(j<info->option_count){
-        fprintf(stderr,"opening %s %d\n",aname,id);
+        if(!strcmp(info->options[j],ao.key))break;
+      if(j<info->option_count)
         if((ret=ao_open_live(id,&sf,&ao)))break;
-        fprintf(stderr,"open fialed\n");
-      }
     }
   }
   if(ret && sb_verbose)
