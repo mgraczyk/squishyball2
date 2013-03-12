@@ -517,38 +517,6 @@ int setup_windows(pcm_t **pcm, int test_files,
     beep2[i] = w*b*mul*2;
   }
 
-  /* make sure that the samples are at least fragsamples*3 in length! If they're not, extend... */
-  {
-    int bps = (pcm[0]->bits+7)/8;
-    int ch = pcm[0]->ch;
-    int bpf = bps*ch;
-
-    if(pcm[0]->size<fragsamples*bpf*3){
-      int fadesize = pcm[0]->size/4;
-
-      for(i=0;i<test_files;i++){
-        int j,k;
-        unsigned char *newd=calloc(fragsamples*3,bpf);
-        if(!newd){
-          fprintf(stderr,"Unable to allocate memory to extend sample to minimum length.\n");
-          exit(5);
-        }
-        memcpy(newd,pcm[i]->data,fragsamples*3*bpf);
-        free(pcm[i]->data);
-        pcm[i]->data=newd;
-
-        newd+=pcm[i]->size-fadesize;
-        for(j=0;j<fadesize;j++){
-          float v = cosf(M_PI*.5f*(i+.5f)/fadesize);
-          for(k=0;k<ch;k++){
-            put_val(newd,bps,v * get_val(newd,bps));
-            newd+=bps;
-          }
-        }
-        pcm[i]->size=fragsamples*3;
-      }
-    }
-  }
   return fragsamples;
 }
 
