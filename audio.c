@@ -425,6 +425,12 @@ int setup_windows(pcm_t **pcm, int test_files,
   int i;
   int fragsamples = pcm[0]->rate/10;  /* 100ms */
   float mul = (pcm[0]->bits==24 ? 8388608.f : 32768.f) * .0625;
+  int bps=(pcm[0]->bits+7)/8;
+  int ch=pcm[0]->ch;
+  int bpf=ch*bps;
+  int maxsamples = pcm[0]->size / bpf;
+  if (fragsamples * 3 > maxsamples)
+    fragsamples = maxsamples / 3;
   /* precompute the fades/beeps */
   float *fadewindow1 = *fw1 = calloc(fragsamples,sizeof(*fadewindow1));
   float *fadewindow2 = *fw2 = calloc(fragsamples,sizeof(*fadewindow2));
