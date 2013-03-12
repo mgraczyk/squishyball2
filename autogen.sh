@@ -108,21 +108,26 @@ if test "$DIE" -eq 1; then
         exit 1
 fi
 
-if test -z "$*"; then
-        echo "I am going to run ./configure with no arguments - if you wish "
-        echo "to pass any to it, please specify them on the $0 command line."
-fi
-
 /bin/echo "Generating configuration files for $package, please wait...."
 
 /bin/echo "  $ACLOCAL $ACLOCAL_FLAGS"
 $ACLOCAL $ACLOCAL_FLAGS || exit 1
-/bin/echo "  $LIBTOOLIZE --automake --force"
-$LIBTOOLIZE --automake --force || exit 1
-/bin/echo "  $AUTOMAKE --add-missing $AUTOMAKE_FLAGS"
-$AUTOMAKE --add-missing $AUTOMAKE_FLAGS || exit 1
+/bin/echo "  $LIBTOOLIZE --automake --copy --force"
+$LIBTOOLIZE --automake --copy --force || exit 1
+/bin/echo "  $AUTOMAKE --add-missing --copy $AUTOMAKE_FLAGS"
+$AUTOMAKE --add-missing --copy $AUTOMAKE_FLAGS || exit 1
 /bin/echo "  autoconf"
 autoconf || exit 1
+
+if test "x$1" = "x--noconfigure"; then
+        exit 0
+fi
+
+if test -z "$*"; then
+        echo "I am going to run ./configure with no arguments - if you wish "
+        echo "to pass any to it, please specify them on the $0 command line."
+        echo "(Use --noconfigure to suppress running configure at all.)"
+fi
 
 cd $olddir
 $srcdir/configure "$@" && /bin/echo
