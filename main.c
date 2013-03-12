@@ -101,7 +101,7 @@ void usage(FILE *out){
           "                           playback. Currently only affects\n"
           "                           Vorbis and Opus playback; all other\n"
           "                           files are dithered by default during\n"
-          "                           down-\n conversion.\n"
+          "                           down-conversion.\n"
           "  -e --end-time <time>   : Set sample end time for playback\n"
           "  -g --gabbagabbahey     : Display a running trials score along\n"
           "                           with indicating if each trial choice\n"
