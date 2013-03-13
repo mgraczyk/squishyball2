@@ -664,7 +664,7 @@ int main(int argc, char **argv){
       exit(5);
     }
     if(start_pos<0)start_pos=0;
-    if(start_pos>size-fragsize)start_pos=size-fragsize;
+    if(start_pos>size-fragsize*3)start_pos=size-fragsize*3;
     if(end_pos<fragsize)end_pos=fragsize;
     if(end_pos>size)end_pos=size;
     current_pos=start_pos;
