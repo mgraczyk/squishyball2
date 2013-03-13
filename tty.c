@@ -717,7 +717,7 @@ void panel_toggle_keymap(){
     min_putstrb("        <enter> ");
     min_putstr (": Choose current ");
     if(!p_g){
-      min_putstrb("      <ins/del> ");
+      min_putstrb("  + - <ins/del> ");
       min_putstr (": Undo/redo trial");
     }
     min_mvcur(x,o++);

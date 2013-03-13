@@ -133,7 +133,8 @@ void usage(FILE *out){
           "     A B     : Choose A or B sample for A/B[/X] trial result.\n"
           "   1 2 3...  : Switch between first, second, etc samples.\n"
           "    ! @ #    : Choose sample 1, 2, or 3 for X/X/Y trial result.\n"
-          " <del> <ins> : Undo/redo last trial result selection.\n"
+          "   + -, or   : Undo/redo last trial result selection.\n"
+          " <ins> <del>\n"
           "   <enter>   : Choose current sample for this trial\n"
           "    <- ->    : Seek back/forward two seconds, +shift for 10 seconds\n"
           "  <up/down>  : Select sample from list (casual mode)\n"
@@ -141,8 +142,8 @@ void usage(FILE *out){
           "  <backspc>  : Reset playback to start point\n"
           "      e      : set end playback point to current playback time.\n"
           "      E      : reset end playback time to end of sample\n"
-          "      f      : Toggle through beep-flip/mark-flip/seamless-flip modes.\n"
-          "      r      : Toggle through restart-after/restart-every/no-restart.\n"
+          "      f      : Cycle through beep-flip/mark-flip/seamless-flip modes.\n"
+          "      r      : Cycle through restart-after/restart-every/no-restart.\n"
           "      s      : set start playback point to current playback time.\n"
           "      S      : reset start playback time to 0:00:00.00\n"
           "      ?      : Print this keymap\n"
@@ -786,6 +787,7 @@ int main(int argc, char **argv){
           seek_to+=pcm[0]->rate*bpf*10;
           do_seek=1;
           break;
+        case 0x7f: /* backspace may generate DEL */
         case KEY_BACKSPACE:
           seek_to=start_pos-current_pos;
           do_seek=1;
@@ -819,10 +821,12 @@ int main(int argc, char **argv){
         case '?':
           panel_toggle_keymap();
           break;
+        case '+':
         case 331:
           if(tests_cursor<tests_total && !running_score)
             tests_cursor++;
           break;
+        case '-':
         case 330:
           if(tests_cursor>0 && !running_score){
             tests_cursor--;
