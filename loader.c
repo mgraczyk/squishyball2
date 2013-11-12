@@ -1110,7 +1110,7 @@ static pcm_t *vorbis_load(char *path, FILE *in){
         d[fill++]=pcmout[j][i];
 
     if (sb_verbose && (throttle&0x3f)==0)
-      fprintf(stderr,"\rLoading %s: %ld to go...       ",pcm->name,(long)(pcm->size-fill));
+      fprintf(stderr,"\rLoading %s: %ld to go...       ",pcm->name,(long)(pcm->size-fill*sizeof(float)));
     throttle++;
   }
   ov_clear(&vf);
@@ -1238,7 +1238,7 @@ static pcm_t *opus_load(char *path, FILE *in){
         d[fill++]=*s++;
 
     if (sb_verbose && (throttle&0x3f)==0)
-      fprintf(stderr,"\rLoading %s: %ld to go...       ",pcm->name,(long)(pcm->size-fill));
+      fprintf(stderr,"\rLoading %s: %ld to go...       ",pcm->name,(long)(pcm->size-fill*sizeof(float)));
     throttle++;
   }
   op_free(of);
@@ -1302,7 +1302,7 @@ void free_pcm(pcm_t *pcm){
     if(pcm->matrix)free(pcm->matrix);
     if(pcm->mix)free(pcm->mix);
     if(pcm->data)free(pcm->data);
-    memset(pcm,0,sizeof(pcm));
+    memset(pcm,0,sizeof(*pcm));
     free(pcm);
   }
 }

@@ -357,7 +357,8 @@ static const char *chlist[]={"X","M","L","R","C","LFE","SL","SR","BC","BL","BR",
 
 static void tokenize_channels(char *matrix,int *out,int n){
   int i=0;
-  char *t=strtok(matrix,",");
+  char *copy = strdup(matrix);
+  char *t=strtok(copy,",");
   memset(out,0,sizeof(*out)*n);
 
   while(t){
@@ -370,6 +371,7 @@ static void tokenize_channels(char *matrix,int *out,int n){
     i++;
     t=strtok(NULL,",");
   }
+  free(copy);
 }
 
 /* pre-permute sample ordering so that playback incurs ~equal
@@ -389,7 +391,16 @@ void reconcile_channel_maps(pcm_t *A, pcm_t *B){
   tokenize_channels(A->matrix,ai,A->ch);
   tokenize_channels(B->matrix,bi,A->ch);
 
+  for(i=0;i<A->ch;i++)
+    fprintf(stderr,"%d, ",ai[i]);
+  fprintf(stderr," -> ");
+  for(i=0;i<B->ch;i++)
+    fprintf(stderr,"%d, ",bi[i]);
+  fprintf(stderr,"\n");
+
   for(i=0;i<A->ch;i++){
+    for(k=0;k<bps;k++)
+      p[i*bps+k]=i*bps+k; /* failsafe */
     for(j=0;j<A->ch;j++){
       if(bi[i]==ai[j]){
         for(k=0;k<bps;k++)
@@ -400,7 +411,7 @@ void reconcile_channel_maps(pcm_t *A, pcm_t *B){
   }
 
   d=B->data;
-  for(o=0;o<B->size;){
+  for(o=0;o<B->size;o+=bpf){
     for(i=0;i<bpf;i++)
       temp[p[i]]=d[i];
     memcpy(d,temp,bpf);
@@ -709,7 +720,7 @@ ao_device *setup_playback(int rate, int ch, int bits, char *matrix, char *device
       return NULL;
     aname=ai->short_name;
     if(sb_verbose)
-      fprintf(stderr,"Opening [%s] %s for %d/%d and %d channel[s]...",aname,device,bits,rate,ch);
+      fprintf(stderr,"Opening [%s] %s for %d/%d and %d channel[s]...",aname,"default",bits,rate,ch);
     ret=ao_open_live(id, &sf, &aoe);
     if(sb_verbose){
       if(!ret){
