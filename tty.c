@@ -309,7 +309,7 @@ void panel_init(pcm_t **pcm, int test_files, int test_mode, double start, double
 
   p_tm=test_mode;
   p_ch=pcm[0]->ch;
-  p_b=pcm[0]->bits;
+  p_b=pcm[0]->currentbits;
   p_r=pcm[0]->rate;
   p_pl=0;
   p_st=start;

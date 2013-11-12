@@ -2,7 +2,7 @@
  *
  *  squishyball
  *
- *      Copyright (C) 2010-2012 Xiph.Org
+ *      Copyright (C) 2010-2013 Xiph.Org
  *
  *  squishyball is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -223,38 +223,48 @@ static pcm_t *wav_load(char *path, FILE *in){
     switch(channels){
     case 1:
       pcm->matrix = strdup("M");
+      pcm->mix = strdup("A");
       break;
     case 2:
       pcm->matrix = strdup("L,R");
+      pcm->mix = strdup("BC");
       break;
     case 3:
       pcm->matrix = strdup("L,R,C");
+      pcm->mix = strdup("BCD");
       break;
     case 4:
       pcm->matrix = strdup("L,R,BL,BR");
+      pcm->mix = strdup("BCFG");
       break;
     case 5:
       pcm->matrix = strdup("L,R,C,BL,BR");
+      pcm->mix = strdup("BCDFG");
       break;
     case 6:
       pcm->matrix = strdup("L,R,C,LFE,BL,BR");
+      pcm->mix = strdup("BCDEFG");
       break;
     case 7:
       pcm->matrix = strdup("L,R,C,LFE,BC,SL,SR");
+      pcm->mix = strdup("BCDEJKL");
       break;
     default:
       pcm->matrix = strdup("L,R,C,LFE,BL,BR,SL,SR");
+      pcm->mix = strdup("BCDEFGKL");
       break;
     }
   }else{
-    pcm->matrix = calloc(32*4,sizeof(char));
+    int count=0;
+    pcm->matrix = calloc(32*4+1,sizeof(char));
+    pcm->mix = calloc(33,sizeof(char));
     for(i=0;i<32;i++){
       if(mask&(1<<i)){
         strcat(pcm->matrix,mask_map[i]);
         strcat(pcm->matrix,",");
+        pcm->mix[count++]='B'+i;
       }
     }
-    pcm->matrix[strlen(pcm->matrix)-1]=0;
   }
 
   if(!find_wav_chunk(in, path, "data", &len)){
@@ -279,7 +289,8 @@ static pcm_t *wav_load(char *path, FILE *in){
        now we want to find the size of the file */
     pcm->rate = samplerate;
     pcm->ch = channels;
-    pcm->bits = (format==3 ? -samplesize : samplesize);
+    pcm->nativebits = (format==3 ? -samplesize : samplesize);
+    pcm->currentbits = -32;
 
     if(len){
       pcm->size = len;
@@ -303,19 +314,19 @@ static pcm_t *wav_load(char *path, FILE *in){
   }
 
   /* read the samples into memory */
-  switch(pcm->bits){
+  switch(pcm->nativebits){
   case 8:
-    /* load as 8-bit, expand it out to 16. */
-    pcm->data = calloc(1,pcm->size*2);
+    pcm->data = calloc(1,pcm->size*sizeof(float));
+    break;
+  case 16:
+    pcm->data = calloc(1,pcm->size/2*sizeof(float));
     break;
   case 24:
-    pcm->dither = 1;
-  case 16:
-    pcm->data = calloc(1,pcm->size);
+    pcm->data = calloc(1,pcm->size/3*sizeof(float));
     break;
   case -32:
-    pcm->data = calloc(1,pcm->size);
-    pcm->dither = 1;
+  case 32:
+    pcm->data = calloc(1,pcm->size/4*sizeof(float));
     break;
   default:
     /* Won't get here unless the code is modified and the modifier
@@ -330,12 +341,15 @@ static pcm_t *wav_load(char *path, FILE *in){
   }
 
   {
-    off_t j=0;
+    off_t j=0,k;
+    unsigned char *d = pcm->data;
+    float         *f = (float *)pcm->data;
+
     while(j<pcm->size){
       off_t bytes = (pcm->size-j > 65536 ? 65536 : pcm->size-j);
       if(sb_verbose)
         fprintf(stderr,"\rLoading %s: %ld to go...       ",path,(long)(pcm->size-j));
-      j+=bytes=fread(pcm->data+j,1,bytes,in);
+      j+=bytes=fread(d+j,1,bytes,in);
       if(bytes==0)break;
     }
     if(j<pcm->size){
@@ -344,17 +358,58 @@ static pcm_t *wav_load(char *path, FILE *in){
       pcm->size=j;
     }
 
-    /* 8-bit must be expanded to 16 */
-    if(samplesize==8){
-      off_t j;
-      unsigned char *d = pcm->data;
-      for(j=pcm->size-1;j>=0;j--){
-        int val = (d[j]-128)<<8;
-        d[j*2] = val&0xff;
-        d[j*2+1] = (val>>8)&0xff;
+    /* non float must be expanded to float */
+    switch(pcm->nativebits){
+    case 8:
+      k=pcm->size;
+      for(j=pcm->size-1;j>=0;j--)
+        f[--k] = (int32_t)((d[j]-128)<<24) * (1.f/2147483648.f);
+      pcm->size=pcm->size*sizeof(float);
+      break;
+    case 16:
+      k=pcm->size/2;
+      for(j=pcm->size-2;j>=0;j-=2)
+        f[--k] = (int32_t)((d[j]<<16)|(d[j+1]<<24)) * (1.f/2147483648.f);
+      pcm->size=pcm->size/2*sizeof(float);
+      break;
+    case 24:
+      k=pcm->size*4/3;
+      for(j=pcm->size-3;j>=0;j-=3)
+        f[--k] = (int32_t)((d[j]<<8)|(d[j+1]<<16)|(d[j+2]<<24)) * (1.f/2147483648.f);
+      pcm->size=pcm->size/3*sizeof(float);
+      break;
+    case 32:
+      k=pcm->size/4;
+      for(j=pcm->size-4;j>=0;j-=4)
+        f[--k] = (int32_t)(d[j]|(d[j+1]<<8)|(d[j+2]<<16)|(d[j+3]<<24)) * (1.f/2147483648.f);
+      pcm->size=pcm->size/4*sizeof(float);
+      break;
+    case -32:
+      k=pcm->size/4;
+      for(j=pcm->size-4;j>=0;j-=4){
+        int val=0;
+        int mantissa = d[j] | (d[j+1]<<8) | ((d[j+2]&0x7f)<<16) | (1<<23);
+        int exponent = 127 - ((d[j+2]>>7) | ((d[j+3]&0x7f)<<1));
+        int sign = d[j+3]>>7;
+        if(exponent <= 0){
+          if(exponent == -128){
+            fprintf(stderr,"%s: Input file contains invalid floating point values.\n",pcm->name);
+            exit(6);
+          }
+          if(sign)
+            val = 8388608;
+          else
+            val = 8388607;
+        }else if(exponent <= 24){
+          val = mantissa>>exponent;
+          /* round with tiebreaks toward even */
+          if(((mantissa<<(24-exponent))&0xffffff) + (val&1) > 0x800000) ++val;
+        }
+        if(sign) val= -val;
+        f[--k] = val/8388608.;
       }
-      pcm->bits=16;
-      pcm->size*=2;
+      pcm->size=pcm->size/4*sizeof(float);
+      break;
     }
   }
 
@@ -426,12 +481,6 @@ static double read_IEEE80(unsigned char *buf){
   return ldexp(f, e-16446);
 }
 
-static inline void swap(unsigned char *a, unsigned char *b){
-  unsigned char temp=*a;
-  *a=*b;
-  *b=temp;
-}
-
 static pcm_t *aiff_load(char *path, FILE *in){
   pcm_t *pcm = NULL;
   int aifc; /* AIFC or AIFF? */
@@ -477,21 +526,26 @@ static pcm_t *aiff_load(char *path, FILE *in){
 
   pcm->ch = READ_U16_BE(buffer);
   pcm->rate = (int)read_IEEE80(buffer+8);
-  pcm->bits = READ_U16_BE(buffer+6);
-  pcm->size = READ_U32_BE(buffer+2)*pcm->ch*((pcm->bits+7)/8);
+  pcm->nativebits = READ_U16_BE(buffer+6);
+  pcm->size = READ_U32_BE(buffer+2)*pcm->ch*((pcm->nativebits+7)/8);
+  pcm->currentbits = -32;
 
   switch(pcm->ch){
   case 1:
     pcm->matrix = strdup("M");
+    pcm->mix = strdup("A");
     break;
   case 2:
     pcm->matrix = strdup("L,R");
+    pcm->mix = strdup("BC");
     break;
   case 3:
     pcm->matrix = strdup("L,R,C");
+    pcm->mix = strdup("BCD");
     break;
   default:
     pcm->matrix = strdup("L,R,BL,BR");
+    pcm->mix = strdup("BCFG");
     break;
   }
 
@@ -530,32 +584,37 @@ static pcm_t *aiff_load(char *path, FILE *in){
   }
 
   int offset = READ_U32_BE(buf2);
-  int blocksize = READ_U32_BE(buf2+4);
 
-  if(!((fp==0 && (pcm->bits==24 || pcm->bits == 16 || pcm->bits == 8)) ||
-       (fp==1 && pcm->bits==32))){
+  if(!((fp==0 && (pcm->nativebits==32 ||
+                  pcm->nativebits==24 ||
+                  pcm->nativebits==16 ||
+                  pcm->nativebits==8)) ||
+       (fp==1 && pcm->nativebits==32))){
     fprintf(stderr,
             "%s: Unsupported type of AIFF/AIFC file\n"
-            " Must be 8-, 16- or 24-bit integer or 32-bit floating point PCM.\n",
+            " Must be 8-, 16-, 24- or 32-bit integer or 32-bit floating point PCM.\n",
             path);
     goto err;
   }
   if(fp==1)
-    pcm->bits = -pcm->bits;
+    pcm->nativebits = -pcm->nativebits;
 
   fseek(in, offset, SEEK_CUR); /* Swallow some data */
 
   /* read the samples into memory */
-  switch(pcm->bits){
+  switch(pcm->nativebits){
   case 8:
-    /* load as 8-bit, expand it out to 16. */
-    pcm->data = calloc(1,pcm->size*2);
+    pcm->data = calloc(1,pcm->size*sizeof(float));
+    break;
+  case 16:
+    pcm->data = calloc(1,pcm->size/2*sizeof(float));
     break;
   case 24:
-    pcm->dither = 1;
-    /* fall through */
-  default:
-    pcm->data = calloc(1,pcm->size);
+    pcm->data = calloc(1,pcm->size/3*sizeof(float));
+    break;
+  case 32:
+  case -32:
+    pcm->data = calloc(1,pcm->size/4*sizeof(float));
     break;
   }
 
@@ -566,7 +625,8 @@ static pcm_t *aiff_load(char *path, FILE *in){
 
   {
     unsigned char *d = pcm->data;
-    off_t j=0;
+    float *f = (float *)pcm->data;
+    off_t j=0,k;
     while(j<pcm->size){
       off_t bytes = (pcm->size-j > 65536 ? 65536 : pcm->size-j);
       if(sb_verbose)
@@ -580,36 +640,83 @@ static pcm_t *aiff_load(char *path, FILE *in){
       pcm->size=j;
     }
 
-    /* 8-bit must be expanded to 16 */
-    switch(pcm->bits){
+    /* expand to float */
+    switch(pcm->nativebits){
     case 8:
-      for(j=pcm->size-1;j>=0;j--){
-        int val = d[j]<<8;
-        d[j*2] = val&0xff;
-        d[j*2+1] = (val>>8)&0xff;
-      }
-      pcm->bits=16;
-      pcm->size*=2;
+      k=pcm->size;
+      for(j=pcm->size-1;j>=0;j--)
+        f[--k] = (int32_t)((d[j]-128)<<24) * (1.f/2147483648.f);
+      pcm->size=pcm->size*sizeof(float);
       break;
     case 16:
+      k=pcm->size/2;
       if(bend){
-        for(j=0;j<pcm->size/2;j++)
-          swap(d+j*2,d+j*2+1);
+        for(j=pcm->size-2;j>=0;j-=2)
+          f[--k] = (int32_t)((d[j]<<24)|(d[j+1]<<16)) * (1.f/2147483648.f);
+      }else{
+        for(j=pcm->size-2;j>=0;j-=2)
+          f[--k] = (int32_t)((d[j]<<16)|(d[j+1]<<24)) * (1.f/2147483648.f);
       }
+      pcm->size=pcm->size/2*sizeof(float);
       break;
     case 24:
+      k=pcm->size/3;
       if(bend){
-        for(j=0;j<pcm->size/3;j++)
-          swap(d+j*3,d+j*3+2);
+        for(j=pcm->size-3;j>=0;j-=3)
+          f[--k] = (int32_t)(d[j+2]|(d[j+1]<<8)|(d[j]<<16)) * (1.f/2147483648.f);
+      }else{
+        for(j=pcm->size-3;j>=0;j-=3)
+          f[--k] = (int32_t)(d[j]|(d[j+1]<<8)|(d[j+2]<<16)) * (1.f/2147483648.f);
       }
+      pcm->size=pcm->size/3*sizeof(float);
+      break;
+    case 32:
+      k=pcm->size/4;
+      if(bend){
+        for(j=pcm->size-4;j>=0;j-=4)
+          f[--k] = (int32_t)(d[j+3]|(d[j+2]<<8)|(d[j+1]<<16)|(d[j]<<24)) * (1.f/2147483648.f);
+      }else{
+        for(j=pcm->size-4;j>=0;j-=4)
+          f[--k] = (int32_t)(d[j]|(d[j+1]<<8)|(d[j+2]<<16)|(d[j+3]<<24)) * (1.f/2147483648.f);
+      }
+      pcm->size=pcm->size/4*sizeof(float);
       break;
     case -32:
-      if(bend){
-        for(j=0;j<pcm->size/4;j++) {
-          swap(d+j*4,d+j*4+3);
-          swap(d+j*4+1,d+j*4+2);
+      k=pcm->size/4;
+      for(j=pcm->size-4;j>=0;j-=4){
+        int val=0;
+        int mantissa;
+        int exponent;
+        int sign;
+
+        if(bend){
+          mantissa = d[j+3] | (d[j+2]<<8) | ((d[j+1]&0x7f)<<16) | (1<<23);
+          exponent = 127 - ((d[j+1]>>7) | ((d[j]&0x7f)<<1));
+          sign = d[j]>>7;
+        }else{
+          mantissa = d[j] | (d[j+1]<<8) | ((d[j+2]&0x7f)<<16) | (1<<23);
+          exponent = 127 - ((d[j+2]>>7) | ((d[j+3]&0x7f)<<1));
+          sign = d[j+3]>>7;
         }
+
+        if(exponent <= 0){
+          if(exponent == -128){
+            fprintf(stderr,"%s: Input file contains invalid floating point values.\n",pcm->name);
+            exit(6);
+          }
+          if(sign)
+            val = 8388608;
+          else
+            val = 8388607;
+        }else if(exponent <= 24){
+          val = mantissa>>exponent;
+          /* round with tiebreaks toward even */
+          if(((mantissa<<(24-exponent))&0xffffff) + (val&1) > 0x800000) ++val;
+        }
+        if(sign) val= -val;
+        f[--k] = val/8388608.;
       }
+      pcm->size=pcm->size/4*sizeof(float);
       break;
     }
   }
@@ -627,13 +734,14 @@ static pcm_t *aiff_load(char *path, FILE *in){
 /* SW loading to make JM happy *******************************************************/
 
 static pcm_t *sw_load(char *path, FILE *in){
-
   pcm_t *pcm = calloc(1,sizeof(pcm_t));
   pcm->name=strdup(trim_path(path));
-  pcm->bits=16;
+  pcm->nativebits=16;
+  pcm->currentbits=-32;
   pcm->ch=1;
   pcm->rate=48000;
   pcm->matrix=strdup("M");
+  pcm->mix=strdup("A");
 
   if(fseek(in,0,SEEK_END)==-1){
     fprintf(stderr,"%s: Failed to seek\n",path);
@@ -645,7 +753,7 @@ static pcm_t *sw_load(char *path, FILE *in){
     goto err;
   }
 
-  pcm->data = calloc(1,pcm->size);
+  pcm->data = calloc(1,pcm->size/2*sizeof(float));
 
   if(pcm->data == NULL){
     fprintf(stderr,"Unable to allocate enough memory to load sample into memory\n");
@@ -654,6 +762,9 @@ static pcm_t *sw_load(char *path, FILE *in){
 
   {
     off_t j=0;
+    int16_t *d = (int16_t *)pcm->data;
+    float   *f = (float *)pcm->data;
+
     while(j<pcm->size){
       off_t bytes = (pcm->size-j > 65536 ? 65536 : pcm->size-j);
       if(sb_verbose)
@@ -666,6 +777,11 @@ static pcm_t *sw_load(char *path, FILE *in){
         fprintf(stderr,"\r%s: File ended before declared length (%ld < %ld); continuing...\n",path,(long)j,(long)pcm->size);
       pcm->size=j;
     }
+
+    for(j=pcm->size/2-1;j>=0;j--)
+      f[j] = d[j]/32768.;
+
+    pcm->size=pcm->size/2*sizeof(float);
   }
 
   if(sb_verbose)
@@ -723,8 +839,9 @@ static FLAC__StreamDecoderWriteStatus write_callback(const FLAC__StreamDecoder *
   if(pcm->data == NULL){
     /* lazy initialization */
     pcm->ch = channels;
-    pcm->bits = (bits_per_sample+7)/8*8;
-    pcm->size *= pcm->bits/8*channels;
+    pcm->nativebits = (bits_per_sample+7)/8*8;
+    pcm->size *= channels*sizeof(float);
+    pcm->currentbits = -32;
     pcm->data = calloc(pcm->size,1);
   }
 
@@ -732,34 +849,24 @@ static FLAC__StreamDecoderWriteStatus write_callback(const FLAC__StreamDecoder *
     fprintf(stderr,"\r%s: number of channels changes part way through file\n",pcm->name);
     return FLAC__STREAM_DECODER_WRITE_STATUS_ABORT;
   }
-  if(pcm->bits != (bits_per_sample+7)/8*8){
+  if(pcm->nativebits != (bits_per_sample+7)/8*8){
     fprintf(stderr,"\r%s: bit depth changes part way through file\n",pcm->name);
     return FLAC__STREAM_DECODER_WRITE_STATUS_ABORT;
   }
 
   {
-    unsigned char *d = pcm->data + fill;
-    int shift = pcm->bits - bits_per_sample;
-    switch(pcm->bits){
+    float *d = (float *)pcm->data;
+    int shift = pcm->nativebits - bits_per_sample;
+    switch(pcm->nativebits){
     case 16:
       for (j = 0; j < samples; j++)
-        for (i = 0; i < channels; i++){
-          d[0] = (buffer[i][j]<<shift)&0xff;
-          d[1] = (buffer[i][j]<<shift>>8)&0xff;
-          d+=2;
-          fill+=2;
-        }
+        for (i = 0; i < channels; i++)
+          d[fill++] = (buffer[i][j]<<shift)*(1.f/32768.f);
       break;
     case 24:
-      pcm->dither = 1;
       for (j = 0; j < samples; j++)
-        for (i = 0; i < channels; i++){
-          d[0] = (buffer[i][j]<<shift)&0xff;
-          d[1] = (buffer[i][j]<<shift>>8)&0xff;
-          d[2] = (buffer[i][j]<<shift>>16)&0xff;
-          d+=3;
-          fill+=3;
-        }
+        for (i = 0; i < channels; i++)
+          d[fill++] = (buffer[i][j]<<shift)*(1.f/8388608.f);
       break;
     default:
       fprintf(stderr,"\r%s: Only 16- and 24-bit FLACs are supported for decode right now.\n",pcm->name);
@@ -860,27 +967,35 @@ static pcm_t *flac_load_i(char *path, FILE *in, int oggp){
   switch(pcm->ch){
   case 1:
     pcm->matrix = strdup("M");
+    pcm->mix = strdup("A");
     break;
   case 2:
     pcm->matrix = strdup("L,R");
+    pcm->mix = strdup("BC");
     break;
   case 3:
     pcm->matrix = strdup("L,R,C");
+    pcm->mix = strdup("BCD");
     break;
   case 4:
     pcm->matrix = strdup("L,R,BL,BR");
+    pcm->mix = strdup("BCFG");
     break;
   case 5:
     pcm->matrix = strdup("L,R,C,BL,BR");
+    pcm->mix = strdup("BCDFG");
     break;
   case 6:
     pcm->matrix = strdup("L,R,C,LFE,BL,BR");
+    pcm->mix = strdup("BCDEFG");
     break;
   case 7:
     pcm->matrix = strdup("L,R,C,LFE,BC,SL,SR");
+    pcm->mix = strdup("BCDEJKL");
     break;
   default:
     pcm->matrix = strdup("L,R,C,LFE,BL,BR,SL,SR");
+    pcm->mix = strdup("BCDEFGKL");
     break;
   }
 
@@ -923,45 +1038,54 @@ static pcm_t *vorbis_load(char *path, FILE *in){
   vi=ov_info(&vf,-1);
   pcm = calloc(1,sizeof(pcm_t));
   pcm->name=strdup(trim_path(path));
-  pcm->bits=-32;
+  pcm->nativebits=-32;
+  pcm->currentbits=-32;
   pcm->ch=vi->channels;
   pcm->rate=vi->rate;
-  pcm->size=ov_pcm_total(&vf,-1)*vi->channels*4;
+  pcm->size=ov_pcm_total(&vf,-1)*vi->channels*sizeof(float);
   pcm->data=calloc(pcm->size,1);
 
   switch(pcm->ch){
   case 1:
     pcm->matrix = strdup("M");
+    pcm->mix = strdup("A");
     break;
   case 2:
     pcm->matrix = strdup("L,R");
+    pcm->mix = strdup("BC");
     break;
   case 3:
     pcm->matrix = strdup("L,C,R");
+    pcm->mix = strdup("BDC");
     break;
   case 4:
     pcm->matrix = strdup("L,R,BL,BR");
+    pcm->mix = strdup("BCFG");
     break;
   case 5:
     pcm->matrix = strdup("L,C,R,BL,BR");
+    pcm->mix = strdup("BDCFG");
     break;
   case 6:
     pcm->matrix = strdup("L,C,R,BL,BR,LFE");
+    pcm->mix = strdup("BDCFGE");
     break;
   case 7:
     pcm->matrix = strdup("L,C,R,SL,SR,BC,LFE");
+    pcm->mix = strdup("BDCKLJE");
     break;
   default:
     pcm->matrix = strdup("L,C,R,SL,SR,BL,BR,LFE");
+    pcm->mix = strdup("BDCKLFGE");
     break;
   }
 
-  while(fill<pcm->size){
+  while(fill*sizeof(float)<pcm->size){
     int current_section;
     int i,j;
     float **pcmout;
     long ret=ov_read_float(&vf,&pcmout,4096,&current_section);
-    unsigned char *d = pcm->data+fill;
+    float *d = (float *)pcm->data;
 
     if(current_section!=last_section){
       last_section=current_section;
@@ -981,40 +1105,10 @@ static pcm_t *vorbis_load(char *path, FILE *in){
       goto err;
     }
 
-    if(sizeof(float)==4){
-      /* Assuming IEEE754, which is pedantically incorrect */
-      union {
-        float f;
-        unsigned char c[4];
-      } m;
-      if(host_is_big_endian()){
-        for(i=0;i<ret;i++){
-          for(j=0;j<pcm->ch;j++){
-            m.f=pcmout[j][i];
-            d[0] = m.c[3];
-            d[1] = m.c[2];
-            d[2] = m.c[1];
-            d[3] = m.c[0];
-            d+=4;
-          }
-        }
-      }else{
-        for(i=0;i<ret;i++){
-          for(j=0;j<pcm->ch;j++){
-            m.f=pcmout[j][i];
-            d[0] = m.c[0];
-            d[1] = m.c[1];
-            d[2] = m.c[2];
-            d[3] = m.c[3];
-            d+=4;
-          }
-        }
-      }
-    }else{
-      fprintf(stderr,"Unhandled case: sizeof(float)!=4\n");
-      exit(10);
-    }
-    fill += ret*pcm->ch*4;
+    for(i=0;i<ret;i++)
+      for(j=0;j<pcm->ch;j++)
+        d[fill++]=pcmout[j][i];
+
     if (sb_verbose && (throttle&0x3f)==0)
       fprintf(stderr,"\rLoading %s: %ld to go...       ",pcm->name,(long)(pcm->size-fill));
     throttle++;
@@ -1057,7 +1151,6 @@ static pcm_t *opus_load(char *path, FILE *in){
   off_t fill=0;
   int throttle=0;
   int last_section=-1;
-  int i,j;
 
   if(fseek(in,0,SEEK_SET)==-1){
     fprintf(stderr,"%s: Failed to seek\n",path);
@@ -1072,46 +1165,55 @@ static pcm_t *opus_load(char *path, FILE *in){
 
   pcm = calloc(1,sizeof(pcm_t));
   pcm->name=strdup(trim_path(path));
-  pcm->bits=-32;
+  pcm->nativebits=-32;
+  pcm->currentbits=-32;
   pcm->ch=op_channel_count(of,-1);
   pcm->rate=48000;
-  pcm->size=op_pcm_total(of,-1)*pcm->ch*4;
+  pcm->size=op_pcm_total(of,-1)*pcm->ch*sizeof(float);
   pcm->data=calloc(pcm->size,1);
 
 
   switch(pcm->ch){
   case 1:
     pcm->matrix = strdup("M");
+    pcm->mix = strdup("A");
     break;
   case 2:
     pcm->matrix = strdup("L,R");
+    pcm->mix = strdup("BC");
     break;
   case 3:
     pcm->matrix = strdup("L,C,R");
+    pcm->mix = strdup("BDC");
     break;
   case 4:
     pcm->matrix = strdup("L,R,BL,BR");
+    pcm->mix = strdup("BCFG");
     break;
   case 5:
     pcm->matrix = strdup("L,C,R,BL,BR");
+    pcm->mix = strdup("BDCFG");
     break;
   case 6:
     pcm->matrix = strdup("L,C,R,BL,BR,LFE");
+    pcm->mix = strdup("BDCFGE");
     break;
   case 7:
     pcm->matrix = strdup("L,C,R,SL,SR,BC,LFE");
+    pcm->mix = strdup("BDCKLJE");
     break;
   default:
     pcm->matrix = strdup("L,C,R,SL,SR,BL,BR,LFE");
+    pcm->mix = strdup("BDCKLFGE");
     break;
   }
 
-  while(fill<pcm->size){
+  while(fill*sizeof(float)<pcm->size){
     int current_section;
     int i,j;
     float pcmout[4096];
     long ret=op_read_float(of,pcmout,4096,&current_section);
-    unsigned char *d = pcm->data+fill;
+    float *d = (float *)pcm->data;
     float *s = pcmout;
 
     if(current_section!=last_section){
@@ -1131,40 +1233,10 @@ static pcm_t *opus_load(char *path, FILE *in){
       goto err;
     }
 
-    if(sizeof(float)==4){
-      /* Assuming IEEE754, which is pedantically incorrect */
-      union {
-        float f;
-        unsigned char c[4];
-      } m;
-      if(host_is_big_endian()){
-        for(i=0;i<ret;i++){
-          for(j=0;j<pcm->ch;j++){
-            m.f=*s++;
-            d[0] = m.c[3];
-            d[1] = m.c[2];
-            d[2] = m.c[1];
-            d[3] = m.c[0];
-            d+=4;
-          }
-        }
-      }else{
-        for(i=0;i<ret;i++){
-          for(j=0;j<pcm->ch;j++){
-            m.f=*s++;
-            d[0] = m.c[0];
-            d[1] = m.c[1];
-            d[2] = m.c[2];
-            d[3] = m.c[3];
-            d+=4;
-          }
-        }
-      }
-    }else{
-      fprintf(stderr,"Unhandled case: sizeof(float)!=4\n");
-      exit(10);
-    }
-    fill += ret*pcm->ch*4;
+    for(i=0;i<ret;i++)
+      for(j=0;j<pcm->ch;j++)
+        d[fill++]=*s++;
+
     if (sb_verbose && (throttle&0x3f)==0)
       fprintf(stderr,"\rLoading %s: %ld to go...       ",pcm->name,(long)(pcm->size-fill));
     throttle++;
@@ -1172,7 +1244,7 @@ static pcm_t *opus_load(char *path, FILE *in){
   op_free(of);
 
   if(sb_verbose)
-    fprintf(stderr,"\r%s: loaded.                 \n",path);
+    fprintf(stderr,  "\r%s: loaded.                          \n",path);
   return pcm;
  err:
   op_free(of);
@@ -1190,7 +1262,7 @@ static input_format formats[] = {
   {flac_id,    flac_load,   "flac"},
   {oggflac_id, oggflac_load,"oggflac"},
   {vorbis_id,  vorbis_load, "oggvorbis"},
-  {opus_id,  opus_load,     "oggopus"},
+  {opus_id,    opus_load,   "oggopus"},
   {sw_id,      sw_load,     "sw"},
   {NULL,       NULL,        NULL}
 };
@@ -1228,6 +1300,7 @@ void free_pcm(pcm_t *pcm){
   if(pcm){
     if(pcm->name)free(pcm->name);
     if(pcm->matrix)free(pcm->matrix);
+    if(pcm->mix)free(pcm->mix);
     if(pcm->data)free(pcm->data);
     memset(pcm,0,sizeof(pcm));
     free(pcm);

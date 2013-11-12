@@ -2,7 +2,7 @@
  *
  *  squishyball
  *
- *      Copyright (C) 2010 Xiph.Org
+ *      Copyright (C) 2010-2013 Xiph.Org
  *
  *  squishyball is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -31,22 +31,28 @@ typedef struct pcm_struct pcm_t;
 struct pcm_struct {
   char *name;
   int rate;
-  int bits; /* negative indicates IEEE754 float */
+  int currentbits; /* negative indicates float */
+  int nativebits;  /* negative indicates float */
   int ch;
   char *matrix;
+  char *mix;
   unsigned char *data;
   off_t size;
-  int dither;
 };
 
 extern int sb_verbose;
+#define todB(x)   ((x)==0?-400.f:log((x)*(x))*4.34294480f)
 
 extern pcm_t *load_audio_file(char *path);
 extern void free_pcm(pcm_t *pcm);
-void check_warn_clipping(pcm_t *pcm);
+extern float check_warn_clipping(pcm_t *pcm, int no_normalize);
 
-extern void convert_to_16(pcm_t *pcm);
+extern void convert_to_16(pcm_t *pcm, int dither);
 extern void convert_to_24(pcm_t *pcm);
+extern void convert_to_32(pcm_t *pcm);
+extern float convert_to_mono(pcm_t *pcm);
+extern float convert_to_stereo(pcm_t *pcm);
+extern void normalize(pcm_t *pcm, float att);
 extern void reconcile_channel_maps(pcm_t *A, pcm_t *B);
 extern void put_val(unsigned char *d,int bps,float v);
 extern float get_val(unsigned char *d, int bps);

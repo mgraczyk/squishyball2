@@ -180,8 +180,8 @@ static inline int fifo_push(int nonblock){
     return ERR;
 
   if(nonblock){
-    int ret;
 #ifdef __APPLE__
+    int ret;
     fd_set fds;
     struct timeval zeroto = {0,0};
     FD_ZERO(&fds);
@@ -192,7 +192,7 @@ static inline int fifo_push(int nonblock){
     }
 #else
     struct pollfd fds={STDIN_FILENO,POLLIN,0};
-    ret=poll(&fds, 1, 0);
+    poll(&fds, 1, 0);
     if(!fds.revents&(POLLIN)){
       return ERR;
     }

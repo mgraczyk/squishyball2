@@ -2,7 +2,7 @@
  *
  *  squishyball
  *
- *      Copyright (C) 2010 Xiph.Org
+ *      Copyright (C) 2010-2013 Xiph.Org
  *
  *  squishyball is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -47,89 +47,211 @@ static inline int host_is_big_endian() {
   return 0;
 }
 
-void check_warn_clipping(pcm_t *pcm){
+static float get_clamp(pcm_t *pcm){
+  if(pcm->nativebits>=0 && pcm->nativebits<24)
+    return 1.f - 1.f/(1<<(pcm->nativebits-1));
+  else
+    return 1.f - 1.f/2147483648.f;
+}
+
+float check_warn_clipping(pcm_t *pcm, int no_normalize){
   int i,j;
-  int bps = (pcm->bits==-32 ? 4 : (pcm->bits+7)>>3);
   int cpf = pcm->ch;
-  int bpf = cpf*bps;
-  int s = pcm->size/bpf;
+  int s = pcm->size/sizeof(float);
+  float clamp;
+  float min,max;
   int flag[cpf];
   size_t count=0;
-  unsigned char *d = pcm->data;
+  float *d = (float *)pcm->data;
 
   memset(flag,0,sizeof(flag));
 
-  switch(pcm->bits){
-  case 16:
-    for(i=0;i<s;i++)
-      for(j=0;j<cpf;j++){
-        short v = d[0] | (d[1]<<8);
-        if(v==-32768 || v==32767)
-          flag[j]++;
-        else{
-          if(flag[j]>1)count+=flag[j];
-          flag[j]=0;
-        }
-        d+=2;
-      }
-    for(j=0;j<cpf;j++)
-      if(flag[j]>1)count+=flag[j];
-    break;
-  case 24:
-    for(i=0;i<s;i++)
-      for(j=0;j<cpf;j++){
-        int v = ((d[0]<<8) | (d[1]<<16) | (d[2]<<24))>>8;
-        if(v==-8388608 || v==8388607)
-          flag[j]++;
-        else{
-          if(flag[j]>1)count+=flag[j];
-          flag[j]=0;
-        }
-        d+=3;
-      }
-    for(j=0;j<cpf;j++)
-      if(flag[j]>1)count+=flag[j];
-    break;
-  case -32:
-    {
-      union {
-        float f;
-        unsigned char c[4];
-      } m;
+  clamp = max = get_clamp(pcm);
+  min=-1.f;
 
-      if(host_is_big_endian()){
-        for(i=0;i<s;i++)
-          for(j=0;j<cpf;j++){
-            m.c[0]=d[3];
-            m.c[1]=d[2];
-          m.c[2]=d[1];
-          m.c[3]=d[0];
-          if(m.f<-1. || m.f>=1.)
-            count++;
-          d+=4;
-          }
+  for(i=0;i<s;i+=pcm->ch)
+    for(j=0;j<pcm->ch;j++){
+      if(d[i+j]<-1.f){
+        if(d[i+j]<min)min=d[i+j];
+        flag[j]++;
+      }else if(d[i+j]>clamp){
+        if(d[i+j]>max)max=d[i+j];
+        flag[j]++;
       }else{
-        for(i=0;i<s;i++)
-          for(j=0;j<cpf;j++){
-            m.c[0]=d[0];
-            m.c[1]=d[1];
-            m.c[2]=d[2];
-            m.c[3]=d[3];
-          if(m.f<-1. || m.f>=1.)
-            count++;
-          d+=4;
-          }
+        if(flag[j]>1)count+=flag[j];
+        flag[j]=0;
       }
     }
-    break;
-  }
+  for(j=0;j<cpf;j++)
+    if(flag[j]>1)count+=flag[j];
 
   if(count){
-    if(bps==4)
-      fprintf(stderr,"CLIPPING WARNING: %ld clipped samples in %s.\n",(long)count,pcm->name);
-    else
-      fprintf(stderr,"CLIPPING WARNING: %ld probably clipped samples in %s.\n",(long)count,pcm->name);
+    if(pcm->nativebits>0){
+      fprintf(stderr,"CLIPPING WARNING: %ld probably clipped samples in %s;\n",(long)count,pcm->name);
+      fprintf(stderr,"                  (can't be repaired with normalization)\n");
+    }else{
+      if(no_normalize){
+        fprintf(stderr,"CLIPPING WARNING: %ld clipped samples in %s;\n",(long)count,pcm->name);
+        fprintf(stderr,"                  normalization disabled on command line.\n");
+      }else{
+        float att = -1./min;
+        if(clamp/max < att) att=clamp/max;
+        if(sb_verbose){
+          fprintf(stderr,"%ld overrange samples after decoding %s (peak %+0.1fdB)\n",(long)count,pcm->name,todB(1./att));
+        }
+        return att;
+      }
+    }
   }
+
+  return 1.;
+}
+
+/* input must be float */
+float convert_to_mono(pcm_t *pcm){
+  int i,j,k;
+  int cpf = pcm->ch;
+  int s = pcm->size/sizeof(float);
+  float *d = (float *)pcm->data;
+  float max=0;
+  float min=0;
+  float att=1.f;
+  float clamp = get_clamp(pcm);
+
+  if(pcm->currentbits!=-32){
+    fprintf(stderr,"Internal error; non-float PCM passed to convert_to_mono.\n");
+    exit(10);
+  }
+
+  if(sb_verbose)
+    fprintf(stderr,"Downmixing to mono... ");
+
+  k=0;
+  for(i=0;i<s;i+=cpf){
+    float acc=0.f;
+    for(j=0;j<cpf;j++)
+      acc+=d[i+j];
+    if(acc>max)max=acc;
+    if(acc<min)min=acc;
+    d[k++]=acc;
+  }
+
+
+  pcm->size/=cpf;
+  pcm->ch=1;
+  if(pcm->matrix)free(pcm->matrix);
+  pcm->matrix=strdup("M");
+  if(min<-1.f) att=-1./min;
+  if(clamp/max < att) att=clamp/max;
+
+  if(sb_verbose){
+    if(att<1.){
+      fprintf(stderr,"done. peak: %+0.1fdB\n",todB(1./att));
+    }else{
+      fprintf(stderr,"done.\n");
+    }
+  }
+  return att;
+}
+
+/* non-normalized */
+static const int left_mix[33]={
+  1.,    /* A: M */
+  1.,    /* B: L */
+  0.,    /* C: R */
+  0.707, /* D: C */
+  0.707, /* E: LFE */
+  0.866, /* F: BL */
+  0.5,   /* G: BR */
+  0.791, /* H: CL */
+  0.612, /* I: CR */
+  0.612, /* J: BC */
+  0.866, /* K: SL */
+  0.5,   /* L: SR */
+  0
+};
+
+static const int right_mix[33]={
+  1.,    /* A: M */
+  0.,    /* B: L */
+  1.,    /* C: R */
+  0.707, /* D: C */
+  0.707, /* E: LFE */
+  0.5,   /* F: BL */
+  0.866, /* G: BR */
+  0.612, /* H: CL */
+  0.791, /* I: CR */
+  0.612, /* J: BC */
+  0.5,   /* K: SL */
+  0.866, /* L: SR */
+  0
+};
+
+/* input must be float */
+float convert_to_stereo(pcm_t *pcm){
+  int i,j,k;
+  int cpf = pcm->ch;
+  int s = pcm->size/sizeof(float);
+  float *d = (float *)pcm->data;
+  float max=0;
+  float min=0;
+  float att=1.f;
+  float clamp = get_clamp(pcm);
+
+  float *lmix,*rmix;
+
+  if(pcm->currentbits!=-32){
+    fprintf(stderr,"Internal error; non-float PCM passed to convert_to_mono.\n");
+    exit(10);
+  }
+  if(pcm->ch<2){
+    fprintf(stderr,"Internal error; can't downmix mono to stereo.\n");
+    exit(10);
+  }
+
+  if(sb_verbose)
+    fprintf(stderr,"Downmixing to stereo... ");
+
+  lmix=calloc(cpf,sizeof(*lmix));
+  rmix=calloc(cpf,sizeof(*rmix));
+  for(j=0;j<cpf;j++){
+    lmix[j] = left_mix[pcm->mix[j]-'A'];
+    rmix[j] = right_mix[pcm->mix[j]-'A'];
+  }
+
+  k=0;
+  for(i=0;i<s;i+=cpf){
+    float L=0.f,R=0.f;
+
+    for(j=0;j<cpf;j++){
+      L+=d[i+j]*lmix[j];
+      R+=d[i+j]*rmix[j];
+    }
+
+    if(L>max)max=L;
+    if(L<min)min=L;
+    if(R>max)max=R;
+    if(R<min)min=R;
+    d[k++]=L;
+    d[k++]=R;
+  }
+
+  pcm->size=pcm->size/cpf*2;
+  pcm->ch=2;
+  if(pcm->matrix)free(pcm->matrix);
+  pcm->matrix=strdup("L,R");
+
+  if(min<-1.f) att=-1./min;
+  if(clamp/max < att) att=clamp/max;
+
+  if(sb_verbose){
+    if(att<1.f){
+      fprintf(stderr,"done. peak: %+0.1fdB\n",todB(1./att));
+    }else{
+      fprintf(stderr,"done.\n");
+    }
+  }
+  return att;
 }
 
 static inline float triangle_ditherval(float *save){
@@ -139,204 +261,94 @@ static inline float triangle_ditherval(float *save){
   return ret;
 }
 
-static void float32_to_24(pcm_t *pcm){
+void convert_to_32(pcm_t *pcm){
   unsigned char *d = pcm->data;
+  float *f = (float *)pcm->data;
   off_t j;
   if(sb_verbose)
-    fprintf(stderr,"\rConverting %s to 24 bit... ",pcm->name);
-  for(j=0;j<pcm->size/4;j++){
-    int val=0;
-    int mantissa = d[j*4] | (d[j*4+1]<<8) | ((d[j*4+2]&0x7f)<<16) | (1<<23);
-    int exponent = 127 - ((d[j*4+2]>>7) | ((d[j*4+3]&0x7f)<<1));
-    int sign = d[j*4+3]>>7;
-    if(exponent <= 0){
-      if(exponent == -128){
-        fprintf(stderr,"%s: Input file contains invalid floating point values.\n",pcm->name);
-        exit(6);
-      }
-      if(sign)
-        val = 8388608;
-      else
-        val = 8388607;
-    }else if(exponent <= 24){
-      val = mantissa>>exponent;
-      /* round with tiebreaks toward even */
-      if(((mantissa<<(24-exponent))&0xffffff) + (val&1) > 0x800000) ++val;
-    }
-    if(sign) val= -val;
-
-    d[j*3]=val&0xff;
-    d[j*3+1]=(val>>8)&0xff;
-    d[j*3+2]=(val>>16)&0xff;
+    fprintf(stderr,"\rConverting %s to 32 bit... ",pcm->name);
+  for(j=0;j<pcm->size/sizeof(float);j++){
+    float val = rint(f[j]*2147483648.f);
+    int iv;
+    if(val<-2147483648.f) val = -2147483648.f;
+    if(val> 2147483647.f) val = 2147483647.f;
+    iv=(int)val;
+    d[j*4]=iv&0xff;
+    d[j*4+1]=(iv>>8)&0xff;
+    d[j*4+2]=(iv>>16)&0xff;
+    d[j*4+3]=(iv>>24)&0xff;
   }
   if(sb_verbose)
     fprintf(stderr,"done.\n");
-  pcm->bits=24;
-  pcm->size/=4;
-  pcm->size*=3;
-}
-
-static void float32_to_16(pcm_t *pcm){
-  unsigned char *d = pcm->data;
-  off_t j;
-  union {
-    float f;
-    unsigned char c[4];
-  } m;
-
-  if(sb_verbose)
-    fprintf(stderr,"\r%s %s to 16 bit... ",
-            pcm->dither?"Dithering":"Down-converting",pcm->name);
-
-  /* again assumes IEEE754, which is not pedantically correct */
-  if(sizeof(float)==4){
-    float t[pcm->ch];
-    int ch=0;
-    memset(t,0,sizeof(t));
-
-    for(j=0;j<pcm->size/4;j++){
-      float val;
-      if(host_is_big_endian()){
-        m.c[0]=d[j*4+3];
-        m.c[1]=d[j*4+2];
-        m.c[2]=d[j*4+1];
-        m.c[3]=d[j*4];
-      }else{
-        m.c[0]=d[j*4];
-        m.c[1]=d[j*4+1];
-        m.c[2]=d[j*4+2];
-        m.c[3]=d[j*4+3];
-      }
-      if(pcm->dither){
-        val = rint(m.f*32768.f + triangle_ditherval(t+ch));
-        ch++;
-        if(ch>pcm->ch)ch=0;
-      }else{
-        val = rint(m.f*32768.f);
-      }
-
-      if(val>=32767.f){
-        d[j*2]=0xff;
-        d[j*2+1]=0x7f;
-      }else if(val<=-32768.f){
-        d[j*2]=0x00;
-        d[j*2+1]=0x80;
-      }else{
-        int iv = (int)val;
-        d[j*2]=iv&0xff;
-        d[j*2+1]=(iv>>8)&0xff;
-      }
-    }
-  }else{
-    fprintf(stderr,"Unhandled case: sizeof(float)!=4\n");
-    exit(10);
-  }
-
-  if(sb_verbose)
-    fprintf(stderr,"done.\n");
-
-  pcm->bits=16;
-  pcm->size/=2;
-}
-
-static void demote_24_to_16(pcm_t *pcm){
-  float t[pcm->ch];
-  unsigned char *d = pcm->data;
-  off_t i;
-  int ch=0;
-
-  if(sb_verbose)
-    fprintf(stderr,"\r%s %s to 16 bit... ",
-            pcm->dither?"Dithering":"Down-converting",pcm->name);
-
-  memset(t,0,sizeof(t));
-
-  for(i=0;i<pcm->size/3;i++){
-    int val = ((d[i*3+2]<<24) | (d[i*3+1]<<16) | (d[i*3]<<8))>>8;
-    if(pcm->dither){
-      val = rint (val*(1.f/256.f)+triangle_ditherval(t+ch));
-      ch++;
-      if(ch>pcm->ch)ch=0;
-    }else
-      val = rint (val*(1.f/256.f));
-
-    if(val>32767){
-      d[i*2]=0xff;
-      d[i*2+1]=0x7f;
-    }else if(val<-32768){
-      d[i*2]=0x00;
-      d[i*2+1]=0x80;
-    }else{
-      d[i*2]=val&0xff;
-      d[i*2+1]=(val>>8)&0xff;
-    }
-  }
-
-  if(sb_verbose)
-    fprintf(stderr,"done.\n");
-
-  pcm->bits=16;
-  pcm->size/=3;
-  pcm->size*=2;
-}
-
-static void promote_to_24(pcm_t *pcm){
-  off_t i;
-
-  if(sb_verbose)
-    fprintf(stderr,"\rPromoting %s to 24 bit... ",pcm->name);
-
-  {
-    unsigned char *ret=realloc(pcm->data,pcm->size*3/2);
-    if(!ret){
-      fprintf(stderr,"Unable to allocate memory while promoting file to 24-bit\n");
-      exit(5);
-    }
-    pcm->data=ret;
-    for(i=pcm->size/2-1;i>=0;i--){
-      ret[i*3+2]=ret[i*2+1];
-      ret[i*3+1]=ret[i*2];
-      ret[i*3]=0;
-    }
-  }
-  if(sb_verbose)
-    fprintf(stderr,"done.\n");
-
-  pcm->bits=24;
-  pcm->size/=2;
-  pcm->size*=3;
-}
-
-void convert_to_16(pcm_t *pcm){
-  switch(pcm->bits){
-  case 16:
-    break;
-  case 24:
-    demote_24_to_16(pcm);
-    break;
-  case -32:
-    float32_to_16(pcm);
-    break;
-  default:
-    fprintf(stderr,"%s: Unsupported sample format.\n",pcm->name);
-    exit(6);
-  }
+  pcm->currentbits=32;
+  pcm->size/=sizeof(float);
+  pcm->size*=4;
 }
 
 void convert_to_24(pcm_t *pcm){
-  switch(pcm->bits){
-  case 16:
-    promote_to_24(pcm);
-    break;
-  case 24:
-    break;
-  case -32:
-    float32_to_24(pcm);
-    break;
-  default:
-    fprintf(stderr,"%s: Unsupported sample format.\n",pcm->name);
-    exit(6);
+  unsigned char *d = pcm->data;
+  float *f = (float *)pcm->data;
+  off_t j;
+  if(sb_verbose)
+    fprintf(stderr,"\rConverting %s to 24 bit... ",pcm->name);
+  for(j=0;j<pcm->size/sizeof(float);j++){
+    float val = rint(f[j]*8388608.f);
+    int iv;
+    if(val<-8388608.f) val = -8388608.f;
+    if(val> 8388607.f) val = 8388607.f;
+    iv=(int)val;
+    d[j*3]=iv&0xff;
+    d[j*3+1]=(iv>>8)&0xff;
+    d[j*3+2]=(iv>>16)&0xff;
   }
+  if(sb_verbose)
+    fprintf(stderr,"done.\n");
+  pcm->currentbits=24;
+  pcm->size/=sizeof(float);
+  pcm->size*=3;
+}
+
+void convert_to_16(pcm_t *pcm, int dither){
+  unsigned char *d = pcm->data;
+  float *f = (float *)pcm->data;
+  off_t j;
+  float t[pcm->ch];
+  int ch=0;
+  memset(t,0,sizeof(t));
+
+  if(sb_verbose)
+    fprintf(stderr,"\r%s %s to 16 bit... ",
+            dither?"Dithering":"Down-converting",pcm->name);
+
+  for(j=0;j<pcm->size/sizeof(float);j++){
+    float val;
+    if(dither){
+      val = rint(f[j]*32768.f + triangle_ditherval(t+ch));
+      ch++;
+      if(ch>pcm->ch)ch=0;
+    }else{
+      val = rint(f[j]*32768.f);
+    }
+
+    if(val>=32767.f){
+      d[j*2]=0xff;
+      d[j*2+1]=0x7f;
+    }else if(val<=-32768.f){
+      d[j*2]=0x00;
+      d[j*2+1]=0x80;
+    }else{
+      int iv = (int)val;
+      d[j*2]=iv&0xff;
+        d[j*2+1]=(iv>>8)&0xff;
+    }
+  }
+
+  if(sb_verbose)
+    fprintf(stderr,"done.\n");
+
+  pcm->currentbits=16;
+  pcm->size/=sizeof(float);
+  pcm->size*=2;
 }
 
 /* Channel map reconciliation helpers *********************************/
@@ -368,7 +380,7 @@ void reconcile_channel_maps(pcm_t *A, pcm_t *B){
   int ai[A->ch],bi[A->ch];
   int i,j,k;
   off_t o;
-  int bps = (B->bits+7)/8;
+  int bps = (B->currentbits+7)/8;
   int bpf = B->ch*bps;
   int p[bpf];
   unsigned char temp[bpf];
@@ -424,8 +436,8 @@ int setup_windows(pcm_t **pcm, int test_files,
                          float **b1, float **b2){
   int i;
   int fragsamples = pcm[0]->rate/10;  /* 100ms */
-  float mul = (pcm[0]->bits==24 ? 8388608.f : 32768.f) * .0625;
-  int bps=(pcm[0]->bits+7)/8;
+  float mul = (pcm[0]->currentbits==24 ? 8388608.f : 32768.f) * .0625;
+  int bps=(pcm[0]->currentbits+7)/8;
   int ch=pcm[0]->ch;
   int bpf=ch*bps;
   int maxsamples = pcm[0]->size / bpf;
@@ -526,7 +538,7 @@ int setup_windows(pcm_t **pcm, int test_files,
    endpos moved. */
 void fill_fragment1(unsigned char *out, pcm_t *pcm, off_t start, off_t *pos, off_t end, int *loop,
                     int fragsamples, float *fadewindow){
-  int bps = (pcm->bits+7)/8;
+  int bps = (pcm->currentbits+7)/8;
   int cpf = pcm->ch;
   int bpf = bps*cpf;
   int fragsize = fragsamples*bpf;
@@ -618,7 +630,7 @@ void fill_fragment1(unsigned char *out, pcm_t *pcm, off_t start, off_t *pos, off
    schedule' even if that means beginning partway through the window. */
 void fill_fragment2(unsigned char *out, pcm_t *pcm, off_t start, off_t *pos, off_t end, int *loop,
                     int fragsamples, float *fadewindow){
-  int bps = (pcm->bits+7)/8;
+  int bps = (pcm->currentbits+7)/8;
   int cpf = pcm->ch;
   int bpf = bps*cpf;
   int fragsize=fragsamples*bpf;
@@ -696,7 +708,16 @@ ao_device *setup_playback(int rate, int ch, int bits, char *matrix, char *device
     if(!ai)
       return NULL;
     aname=ai->short_name;
+    if(sb_verbose)
+      fprintf(stderr,"Opening [%s] %s for %d/%d and %d channel[s]...",aname,device,bits,rate,ch);
     ret=ao_open_live(id, &sf, &aoe);
+    if(sb_verbose){
+      if(!ret){
+        fprintf(stderr," errno %d\n",errno);
+      }else{
+        fprintf(stderr," ok!\n");
+      }
+    }
   }else{
     /* Otherwise... there's some hunting to do. */
     /* Is the passed device a number or a name? */
@@ -707,6 +728,8 @@ ao_device *setup_playback(int rate, int ch, int bits, char *matrix, char *device
     int i;
 
     if(!device[0] || test[0]) number=-1;
+    if(sb_verbose)
+      fprintf(stderr,"Scanning for a device driver that recognizes '%s'...\n",device);
 
     /* driver info list is sorted by priority */
     for(i=0;i<count;i++){
@@ -726,8 +749,17 @@ ao_device *setup_playback(int rate, int ch, int bits, char *matrix, char *device
          option; it will ignore the option and try to open its default */
       for(j=0;j<info->option_count;j++)
         if(!strcmp(info->options[j],ao.key))break;
-      if(j<info->option_count)
-        if((ret=ao_open_live(id,&sf,&ao)))break;
+      if(j<info->option_count){
+        if(sb_verbose)
+          fprintf(stderr,"  ...trying to open [%s] %s for %d/%d and %d channel[s]...",aname,device,bits,rate,ch);
+        if((ret=ao_open_live(id,&sf,&ao))){
+          if(sb_verbose)
+            fprintf(stderr," ok!\n");
+          break;
+        }
+        if(sb_verbose)
+          fprintf(stderr," errno %d\n",errno);
+      }
     }
   }
   if(ret && sb_verbose)

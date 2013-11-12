@@ -2,7 +2,7 @@
  *
  *  squishyball
  *
- *      Copyright (C) 2010-2012 Xiph.Org
+ *      Copyright (C) 2010-2013 Xiph.Org
  *
  *  squishyball is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -51,7 +51,7 @@
 #define MAXFILES 10
 int sb_verbose=0;
 
-char *short_options="abcd:De:hn:rRs:tvVxBMSg";
+char *short_options="abcd:De:hn:NrRs:tvVxBMSg12";
 
 struct option long_options[] = {
   {"ab",no_argument,0,'a'},
@@ -66,6 +66,7 @@ struct option long_options[] = {
   {"help",no_argument,0,'h'},
   {"mark-flip",no_argument,0,'M'},
   {"trials",required_argument,0,'n'},
+  {"do-not-normalize",no_argument,0,'N'},
   {"restart-after",no_argument,0,'r'},
   {"restart-every",no_argument,0,'R'},
   {"start-time",required_argument,0,'s'},
@@ -74,6 +75,8 @@ struct option long_options[] = {
   {"verbose",no_argument,0,'v'},
   {"version",no_argument,0,'V'},
   {"xxy",no_argument,0,'x'},
+  {"downmix-to-mono",no_argument,0,'1'},
+  {"downmix-to-stereo",no_argument,0,'2'},
   {0,0,0,0}
 };
 
@@ -112,6 +115,8 @@ void usage(FILE *out){
           "                           a short period of silence\n"
           "  -n --trials <n>        : Set desired number of trials\n"
           "                           (default: 20)\n"
+          "  -N --do-not-normalize  : Do not autonormalize samples to avoid\n"
+          "                           clipping\n"
           "  -r --restart-after     : Restart playback from sample start\n"
           "                           after every trial.\n"
           "  -R --restart-every     : Restart playback from sample start\n"
@@ -127,6 +132,8 @@ void usage(FILE *out){
           "  -v --verbose           : Produce more progress information.\n"
           "  -V --version           : Print version and exit.\n"
           "  -x --xxy               : Perform X/X/Y (triangle) test.\n"
+          "  -1 --downmix-to-mono   : Downmix surround samples to mono.\n"
+          "  -2 --downmix-to-stereo : Downmix surround samples to stereo.\n"
           "\n"
           "INTERACTION:\n"
           "    a b x    : Switch playback between A, B [and X] samples.\n"
@@ -368,6 +375,9 @@ int main(int argc, char **argv){
   char *device=NULL;
   int force_dither=0;
   int force_truncate=0;
+  int no_normalize=0;
+  float att=1.;
+  int downmix=0;
   int restart_mode=0;
   int beep_mode=3;
   int tests=20;
@@ -376,7 +386,7 @@ int main(int argc, char **argv){
   int outbits=0;
   ao_device *adev=NULL;
   int randomize[MAXFILES];
-  int i;
+  int i,j;
 
   int  cchoice=-1;
   char choice_list[MAXTRIALS];
@@ -469,6 +479,15 @@ int main(int argc, char **argv){
     case 'g':
       running_score=1;
       break;
+    case 'N':
+      no_normalize=1;
+      break;
+    case '1':
+      downmix=1;
+      break;
+    case '2':
+      downmix=2;
+      break;
     default:
       usage(stderr);
       exit(1);
@@ -503,12 +522,14 @@ int main(int argc, char **argv){
 
   outbits=16;
   for(i=0;i<test_files;i++){
+    float latt;
     pcm[i]=load_audio_file(argv[optind+i]);
     if(!pcm[i])exit(2);
-    check_warn_clipping(pcm[i]);
 
-    if(!pcm[i]->dither && force_dither)pcm[i]->dither=1;
-    if(pcm[i]->bits!=16 && force_truncate)pcm[i]->dither=0;
+    latt=check_warn_clipping(pcm[i],no_normalize);
+    if(downmix==1 && pcm[i]->ch>1) latt=convert_to_mono(pcm[i]);
+    if(downmix==2 && pcm[i]->ch>2) latt=convert_to_stereo(pcm[i]);
+    if(latt<att)att=latt;
 
     /* Are all samples the same rate?  If not, bail. */
     if(pcm[0]->rate != pcm[i]->rate){
@@ -528,12 +549,26 @@ int main(int argc, char **argv){
       exit(3);
     }
 
-    if(abs(pcm[i]->bits)>outbits)outbits=abs(pcm[i]->bits);
+    if(abs(pcm[i]->nativebits)>outbits)outbits=abs(pcm[i]->nativebits);
   }
 
+  if(att<1.f && !no_normalize){
+    fprintf(stderr,"Normalizing all inputs by %+0.1fdB...",todB(att));
+    for(i=0;i<test_files;i++){
+      int s = pcm[i]->size/sizeof(float);
+      float *d = (float *)pcm[i]->data;
+      for(j=0;j<s;j++)
+        d[j]*=att;
+    }
+    fprintf(stderr," done\n");
+
+    /* we normalized-- any 16 bit samples are now > 16 bits, ask for 24 */
+    if(outbits<24)outbits=24;
+  }else
+    no_normalize=1;
+
   /* before proceeding, make sure we can open up playback for the
-     requested number of channels and max bit depth; if not, we may
-     need to downconvert. */
+     desired number of channels and max bit depth */
   if(outbits==32)outbits=24;
   ao_initialize();
   if((adev=setup_playback(pcm[0]->rate,pcm[0]->ch,outbits,pcm[0]->matrix,device))==NULL){
@@ -553,13 +588,26 @@ int main(int argc, char **argv){
     }
   }
 
-  /* reconcile sample depths */
-  for(i=0;i<test_files;i++){
-    if(outbits==16){
-      convert_to_16(pcm[i]);
+  /* convert-- are we dithering? */
+  if(outbits==16){
+    if(no_normalize){
+      /* no normalization, so dither if any integer samples are natively > 16 bit */
+      int flag=force_dither;
+      for(i=0;i<test_files;i++)
+        if(pcm[i]->nativebits>16)flag=1;
+      if(flag && force_truncate)flag=0;
+
+      for(i=0;i<test_files;i++)
+        convert_to_16(pcm[i],(pcm[i]->nativebits>0 || pcm[i]->nativebits<=16)?0:flag);
+
     }else{
-      convert_to_24(pcm[i]);
+      /* normalization! dither everything to 16 bit unless force_truncate is set */
+      for(i=0;i<test_files;i++)
+        convert_to_16(pcm[i],!force_truncate);
     }
+  }else{
+    for(i=0;i<test_files;i++)
+      convert_to_24(pcm[i]);
   }
 
   /* permute/reconcile the matrices before playback begins */
@@ -584,7 +632,7 @@ int main(int argc, char **argv){
       for(i=0;i<test_files;i++){
         if(sb_verbose)
         fprintf(stderr,"\t%s: %s\n",pcm[i]->name,
-                make_time_string((double)pcm[i]->size/pcm[i]->ch/((pcm[i]->bits+7)/8)/pcm[i]->rate,0));
+                make_time_string((double)pcm[i]->size/pcm[i]->ch/((pcm[i]->currentbits+7)/8)/pcm[i]->rate,0));
         pcm[i]->size=n;
       }
       if(sb_verbose)
@@ -615,7 +663,7 @@ int main(int argc, char **argv){
     int do_seek=0;
     int loop=0;
     off_t seek_to=0;
-    int bps=(pcm[0]->bits+7)/8;
+    int bps=(pcm[0]->currentbits+7)/8;
     int ch=pcm[0]->ch;
     int bpf=ch*bps;
     int rate=pcm[0]->rate;

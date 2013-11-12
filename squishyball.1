@@ -1,7 +1,7 @@
 .\" Process this file with
 .\" groff -man -Tascii squishyball.1
 .\"
-.TH squishyball 1 "2012 October 28" "Xiph.Org Foundation" "Xiph Evaluation Tools"
+.TH squishyball 1 "2013 November 9" "Xiph.Org Foundation" "Xiph Evaluation Tools"
 
 .SH NAME
 squishyball \- perform sample comparison testing on the command line
@@ -93,6 +93,10 @@ Print usage summary to stdout and exit.
 Mark transitions between samples with a short period of silence (default).
 .IP "\fB-n --trials \fIn"
 Set desired number of comparison trials (default: 20).
+.IP "\fB-N --do-not-normalize"
+Do not perform autonormalization to avoid clipping when sample values
+exceed the maximum playback range in floating point, lossy, and
+downmixed samples.
 .IP "\fB-r --restart-after"
 Set 'restart-after mode', where sample playback restarts from start point
 after every trial.
@@ -112,8 +116,13 @@ section \fBCONVERSION AND DITHER\fR below for more details.
 Produce more and more detailed progress information and warnings.
 .IP "\fB-V --version"
 Print version and exit.
+.IP "\fB-1 --downmix-to-mono"
+Downmix all multichannel samples to mono at load time.
+.IP "\fB-2 --downmix-to-stereo"
+Downmix all surround samples to stereo at load time.
 
 .SH KEYBOARD INTERACTION
+
 .IP "\fBa\fR, \fBb\fR, \fBx"
 Switch between A and B samples (A/B mode), or A, B and X samples (A/B/X mode).
 .IP "\fBA\fR, \fBB"
@@ -167,33 +176,47 @@ all Vorbis I files
 .IP \fBOggOpus
 all Opus files
 
-.SH CONVERSION AND DITHER
-\fBsquishyball \fRloads all linear PCM file types at native bit depth.
-Uncompressed floating point files (eg, 32 bit floating point WAV) are
-converted to 24-bit integer PCM.  Opus and Ogg Vorbis files are also
-decoded to 24-bit.
+.SH CONVERSION
+\fBsquishyball\fR 'reconciles' files to identical channel ordering,
+length and bit-depth before playback begins so that CPU and memory
+resource usage during playback should be identical for all samples.
+When 24-bit playback is available and at least one sample is 24-bit or
+greater (ie, 32-bit or float), all samples are converted/promoted to
+24 bits.  If 24-bit playback is unavailable, all samples are demoted
+to 16 bits. Note that Opus and Vorbis files are both considered to be
+natively float formats.
 
-Files are 'reconciled' to identical channel ordering, length and
-bit-depth before playback begins so that CPU and memory resources usage
-during playback should be identical for both samples.  When 24-bit
-playback is available and at least one sample is 24-bit, all samples
-are promoted to 24 bits. If 24-bit playback is unavailable, 24-bit samples
-are demoted to 16 bits.
+.SH NORMALIZATION
 
-Floating point samples (32-bit) are not dithered when converting to
-24-bit.  24-bit and floating point (32 bit) samples are dithered using
-a TPDF when down-conversion to 16-bit is necessary.  Lossy-encoded
-samples (eg Ogg Vorbis and Opus files) are an exception; they are not
-dithered by default during down-conversion. This behavior can be
-overridden by \fB-D\fR, which forces dithering for lossy files as
-well.  Down-conversion dithering can be disabled for all input types
-with \fB-t\fR.
+\fBsquishyball\fR checks files for clipping at load time. By default,
+\fBsquishyball\fR will automatically normalize all float inputs by the
+amount needed to avoid clipping any one.  Automatic normalization can
+be disabled with the \fB-N\fR option.  Integer samples are checked for
+clipping heuristically; two or more consecutive full-range values in a
+channel count as clipped.  Out-of-range integer values cannot be
+recovered; in this case, \fBsquishyball\fR issues a warning and
+performs no normalization based on the integer clipping.
 
-Samples are checked for clipping at load time. Floating point samples
-can be checked accurately. Integer samples are checked heuristically;
-two or more consecutive full-range samples in a channel are counted as
-clipped.  If any definitely or probably clipped samples are found,
-\fBsquishyball\fR issues a warning.
+Downmixing samples to mono with \fB-1\fR or stereo with \fB-2\fR will
+also likely require normalization to avoid clipping; as above,
+\fBsquishyball\fR will automatically normalize all inputs by the
+amount necessary to avoid clipping in any one unless \fB-N\fR is
+specified.
+
+.SH DITHER
+Down-conversions of uncompressed and lossless samples (WAV, AIF[C],
+FLAC, SW) to 16-bit are dithered using a simple white TPDF.
+Lossy-encoded samples (Vorbis and Opus) are dithered to 16-bit only if
+one or more uncompressed/lossless inputs are also being dithered.
+Normalization also triggers dithering of all input samples
+(uncompressed, lossless and lossy) upon conversion to 16 bit.
+
+\fB-D\fR overrides the default behavior and forces unconditional
+dithering of all 16-bit down-conversions.  Similarly, \fB-t\fR forces
+unconditional rounded truncation in all cases, disabling dither
+completely.
+
+Conversions to 24-bit are never dithered.
 
 .SH IMPORTANT USAGE NOTES
 .IP "\fBPlayback Depth and Rate"
@@ -202,10 +225,10 @@ Many modern audio playback systems (such as PulseAudio or the
 ALSA 'default' device) give no means of determining if the requested
 playback paramters are actually being used by the hardware, or if the
 audio system is helpfully converting everything to some other
-supported depth/rate.  When using these systems, \fBsquishyball\fR has no
-way of knowing if 16-/24-bit playback or sample rate is being
-honored. Automatic conversion will almost always negatively affect
-sample quality.
+supported depth/rate.  When using these systems, \fBsquishyball\fR has
+no way of knowing if 16-/24-bit playback or sample rate is being
+honored. Automatic conversion can affect audible playback quality; be
+careful to verify actual system behavior.
 
 .IP "\fBFlip-Mode Choice"
 
