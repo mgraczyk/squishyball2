@@ -348,7 +348,7 @@ static pcm_t *wav_load(char *path, FILE *in){
     while(j<pcm->size){
       off_t bytes = (pcm->size-j > 65536 ? 65536 : pcm->size-j);
       if(sb_verbose)
-        fprintf(stderr,"\rLoading %s: %ld to go...       ",path,(long)(pcm->size-j));
+        fprintf(stderr,"\rLoading %s: %ld to go...       ",pcm->name,(long)(pcm->size-j));
       j+=bytes=fread(d+j,1,bytes,in);
       if(bytes==0)break;
     }
@@ -359,6 +359,9 @@ static pcm_t *wav_load(char *path, FILE *in){
     }
 
     /* non float must be expanded to float */
+    if(sb_verbose)
+      fprintf(stderr,"\rLoading %s: parsing...      ",pcm->name);
+
     switch(pcm->nativebits){
     case 8:
       k=pcm->size;
@@ -414,7 +417,7 @@ static pcm_t *wav_load(char *path, FILE *in){
   }
 
   if(sb_verbose)
-    fprintf(stderr,"\r%s: loaded.                 \n",path);
+    fprintf(stderr,"\rLoading %s: loaded.         ",pcm->name);
 
   return pcm;
  err:
@@ -630,7 +633,7 @@ static pcm_t *aiff_load(char *path, FILE *in){
     while(j<pcm->size){
       off_t bytes = (pcm->size-j > 65536 ? 65536 : pcm->size-j);
       if(sb_verbose)
-        fprintf(stderr,"\rLoading %s: %ld to go...       \r",path,(long)(pcm->size-j));
+        fprintf(stderr,"\rLoading %s: %ld to go...       \r",pcm->name,(long)(pcm->size-j));
       j+=bytes=fread(d+j,1,bytes,in);
       if(bytes==0)break;
     }
@@ -641,6 +644,9 @@ static pcm_t *aiff_load(char *path, FILE *in){
     }
 
     /* expand to float */
+    if(sb_verbose)
+      fprintf(stderr,"\rLoading %s: parsing...      ",pcm->name);
+
     switch(pcm->nativebits){
     case 8:
       k=pcm->size;
@@ -722,7 +728,7 @@ static pcm_t *aiff_load(char *path, FILE *in){
   }
 
   if(sb_verbose)
-    fprintf(stderr,"\r%s: loaded.                 \n",path);
+    fprintf(stderr,"\rLoading %s: loaded.         ",pcm->name);
 
   return pcm;
  err:
@@ -768,7 +774,7 @@ static pcm_t *sw_load(char *path, FILE *in){
     while(j<pcm->size){
       off_t bytes = (pcm->size-j > 65536 ? 65536 : pcm->size-j);
       if(sb_verbose)
-        fprintf(stderr,"\rLoading %s: %ld to go...       ",path,(long)(pcm->size-j));
+        fprintf(stderr,"\rLoading %s: %ld to go...       ",pcm->name,(long)(pcm->size-j));
       j+=bytes=fread(pcm->data+j,1,bytes,in);
       if(bytes==0)break;
     }
@@ -778,6 +784,9 @@ static pcm_t *sw_load(char *path, FILE *in){
       pcm->size=j;
     }
 
+    if(sb_verbose)
+      fprintf(stderr,"\rLoading %s: parsing...      ",pcm->name);
+
     for(j=pcm->size/2-1;j>=0;j--)
       f[j] = d[j]/32768.;
 
@@ -785,7 +794,7 @@ static pcm_t *sw_load(char *path, FILE *in){
   }
 
   if(sb_verbose)
-    fprintf(stderr,"\r%s: loaded.                 \n",path);
+    fprintf(stderr,"\rLoading %s: loaded.         ",pcm->name);
 
   return pcm;
  err:
@@ -853,6 +862,9 @@ static FLAC__StreamDecoderWriteStatus write_callback(const FLAC__StreamDecoder *
     fprintf(stderr,"\r%s: bit depth changes part way through file\n",pcm->name);
     return FLAC__STREAM_DECODER_WRITE_STATUS_ABORT;
   }
+
+  if(sb_verbose)
+    fprintf(stderr,"\rLoading %s: parsing...      ",pcm->name);
 
   {
     float *d = (float *)pcm->data;
@@ -1000,7 +1012,8 @@ static pcm_t *flac_load_i(char *path, FILE *in, int oggp){
   }
 
   if(sb_verbose)
-    fprintf(stderr,"\r%s: loaded.                 \n",path);
+    fprintf(stderr,"\rLoading %s: loaded.         ",pcm->name);
+
   return pcm;
  err:
   return NULL;
@@ -1116,7 +1129,8 @@ static pcm_t *vorbis_load(char *path, FILE *in){
   ov_clear(&vf);
 
   if(sb_verbose)
-    fprintf(stderr,"\r%s: loaded.                 \n",path);
+    fprintf(stderr,"\rLoading %s: loaded.         ",pcm->name);
+
   return pcm;
  err:
   ov_clear(&vf);
@@ -1244,7 +1258,8 @@ static pcm_t *opus_load(char *path, FILE *in){
   op_free(of);
 
   if(sb_verbose)
-    fprintf(stderr,  "\r%s: loaded.                          \n",path);
+    fprintf(stderr,"\rLoading %s: loaded.         ",pcm->name);
+
   return pcm;
  err:
   op_free(of);

@@ -66,6 +66,9 @@ float check_warn_clipping(pcm_t *pcm, int no_normalize){
 
   memset(flag,0,sizeof(flag));
 
+  if(sb_verbose)
+    fprintf(stderr,"\rLoading %s: checking for clipping...",pcm->name);
+
   clamp = max = get_clamp(pcm);
   min=-1.f;
 
@@ -86,6 +89,8 @@ float check_warn_clipping(pcm_t *pcm, int no_normalize){
     if(flag[j]>1)count+=flag[j];
 
   if(count){
+    if(sb_verbose)
+      fprintf(stderr,"\n");
     if(pcm->nativebits>0){
       fprintf(stderr,"CLIPPING WARNING: %ld probably clipped samples in %s;\n",(long)count,pcm->name);
       fprintf(stderr,"                  (can't be repaired with normalization)\n");
@@ -102,6 +107,9 @@ float check_warn_clipping(pcm_t *pcm, int no_normalize){
         return att;
       }
     }
+  }else{
+    if(sb_verbose)
+      fprintf(stderr,"\rLoading %s: done.                   \n",pcm->name);
   }
 
   return 1.;
@@ -391,12 +399,15 @@ void reconcile_channel_maps(pcm_t *A, pcm_t *B){
   tokenize_channels(A->matrix,ai,A->ch);
   tokenize_channels(B->matrix,bi,A->ch);
 
-  for(i=0;i<A->ch;i++)
-    fprintf(stderr,"%d, ",ai[i]);
-  fprintf(stderr," -> ");
-  for(i=0;i<B->ch;i++)
-    fprintf(stderr,"%d, ",bi[i]);
-  fprintf(stderr,"\n");
+  if(sb_verbose){
+    fprintf(stderr,"remapping channels in %s: ",B->name);
+    for(i=0;i<B->ch;i++)
+      fprintf(stderr,"%d%s",bi[i],i+1==B->ch?"":", ");
+    fprintf(stderr," -> ");
+    for(i=0;i<A->ch;i++)
+      fprintf(stderr,"%d%s",ai[i],i+1==A->ch?"":", ");
+    fprintf(stderr,"\n");
+  }
 
   for(i=0;i<A->ch;i++){
     for(k=0;k<bps;k++)
