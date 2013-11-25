@@ -163,7 +163,7 @@ float convert_to_mono(pcm_t *pcm){
 }
 
 /* non-normalized */
-static const int left_mix[33]={
+static const float left_mix[33]={
   1.,    /* A: M */
   1.,    /* B: L */
   0.,    /* C: R */
@@ -179,7 +179,7 @@ static const int left_mix[33]={
   0
 };
 
-static const int right_mix[33]={
+static const float right_mix[33]={
   1.,    /* A: M */
   0.,    /* B: L */
   1.,    /* C: R */
