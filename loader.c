@@ -32,7 +32,7 @@
 #include <errno.h>
 #include <vorbis/vorbisfile.h>
 #include <opusfile.h>
-#include <stream_decoder.h>
+#include <FLAC/stream_decoder.h>
 #include <unistd.h>
 #include "main.h"
 
