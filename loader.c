@@ -2,7 +2,7 @@
  *
  *  squishyball
  *
- *      Copyright (C) 2010-2013 Xiph.Org
+ *      Copyright (C) 2010-2014 Xiph.Org
  *
  *  squishyball is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -376,7 +376,7 @@ static pcm_t *wav_load(char *path, FILE *in){
       pcm->size=pcm->size/2*sizeof(float);
       break;
     case 24:
-      k=pcm->size*4/3;
+      k=pcm->size/3;
       for(j=pcm->size-3;j>=0;j-=3)
         f[--k] = (int32_t)((d[j]<<8)|(d[j+1]<<16)|(d[j+2]<<24)) * (1.f/2147483648.f);
       pcm->size=pcm->size/3*sizeof(float);
