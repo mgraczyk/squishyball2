@@ -4,7 +4,7 @@
 cflags_save="$CFLAGS"
 AC_PREREQ(2.57)
 AC_INIT(main.c)
-AM_INIT_AUTOMAKE(squishyball, 20131125, [vorbis-dev@xiph.org])
+AM_INIT_AUTOMAKE(squishyball, 20140211, [vorbis-dev@xiph.org])
 AC_CONFIG_FILES([Makefile])
 m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([yes])], [AC_SUBST([AM_DEFAULT_VERBOSITY], [1])])
 
