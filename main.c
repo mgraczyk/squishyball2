@@ -756,8 +756,10 @@ int main(int argc, char **argv){
         case KEY_UP:
           if(current_choice>0){
             flip_to=current_choice-1;
-            do_flip=1;
+          } else {
+            flip_to=test_files-1;
           }
+          do_flip=1;
           break;
         case KEY_DOWN:
           flip_to=current_choice+1;
@@ -903,7 +905,9 @@ int main(int argc, char **argv){
           }
           break;
         case 3:
-          if(flip_to>=test_files)
+          if(flip_to==test_files)
+            flip_to=0;
+          else if(flip_to>test_files)
             do_flip=0;
           if(do_select)
             do_select=0;
