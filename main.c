@@ -693,6 +693,10 @@ int main(int argc, char **argv){
     }
 
     /* set up terminal */
+    /* TERM == screen-256color doesn't work, but xterm-256color does */
+    if (strcmp(getenv("TERM"), "screen-256color") == 0) {
+      setenv("TERM", "xterm-256color", 1);
+    }
     atexit(min_panel_remove);
     panel_init(pcm, test_files, test_mode, start, end>0 ? end : len, len,
                beep_mode, restart_mode, tests, running_score);
